@@ -1,0 +1,9 @@
+[project]
+name = "infusers"
+version = "0.1.0"
+description = "Custom ML inference services deployed on fal.ai"
+requires-python = ">=3.11"
+dependencies = ["fal"]
+
+[tool.fal.apps]
+flux-klein-t2i = { ref = "apps/flux_klein_t2i/app.py::FluxKleinT2I", auth = "private" }
