@@ -81,14 +81,52 @@ fal deploy flux-klein-t2i
 
 This creates a permanent endpoint at `https://fal.run/<your-username>/flux-klein-t2i`. Redeploy the same command to update.
 
+All deployments are **private** by default -- only authenticated requests with your `FAL_KEY` can call them.
+
 ### Deployment Options
 
 ```bash
 # Deploy with rolling strategy (zero-downtime updates)
 fal deploy flux-klein-t2i --strategy rolling
+```
 
-# Deploy as public (anyone can call, you pay)
-fal deploy flux-klein-t2i --auth public
+### Calling a Private Endpoint
+
+Private endpoints require a `FAL_KEY` for authentication. Get one from [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys).
+
+**curl:**
+
+```bash
+curl -X POST "https://fal.run/<your-username>/flux-klein-t2i" \
+  -H "Authorization: Key $FAL_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "A cat holding a sign that says hello world"}'
+```
+
+**Python (fal client):**
+
+```python
+import fal
+
+# Uses FAL_KEY env var automatically
+result = fal.run("<your-username>/flux-klein-t2i", arguments={
+    "prompt": "A cat holding a sign that says hello world",
+})
+print(result["images"][0]["url"])
+```
+
+**JavaScript (@fal-ai/client):**
+
+```typescript
+import { fal } from "@fal-ai/client";
+
+// Set FAL_KEY env var, or configure explicitly:
+// fal.config({ credentials: "your_key_id:your_key_secret" });
+
+const result = await fal.subscribe("<your-username>/flux-klein-t2i", {
+  input: { prompt: "A cat holding a sign that says hello world" },
+});
+console.log(result.data.images[0].url);
 ```
 
 ### Managing Deployments
@@ -235,4 +273,5 @@ console.log(result.data.images[0].url);
 | Secret | Where | How |
 |---|---|---|
 | `HF_TOKEN` | fal remote workers | `fal secret set HF_TOKEN <value>` |
-| `FAL_KEY` | jkvc Vercel project | Vercel dashboard env vars |
+| `FAL_KEY` | Local / CI for calling private endpoints | `export FAL_KEY=your_key_id:your_key_secret` |
+| `FAL_KEY` | jkvc Vercel project (frontend proxy) | Vercel dashboard env vars |
