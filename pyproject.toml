@@ -1,9 +1,41 @@
 [project]
 name = "infusers"
 version = "0.1.0"
-description = "Custom ML inference services deployed on fal.ai"
-requires-python = ">=3.11"
-dependencies = ["fal"]
+description = "Custom ML inference — inferencer logic and fal.ai deployments for jkvc"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fal",
+]
+
+[dependency-groups]
+dev = [
+    "black>=25.12.0",
+    "pytest>=8",
+    "ruff>=0.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["infusers"]
 
 [tool.fal.apps]
-flux-klein-t2i = { ref = "apps/flux_klein_t2i/app.py::FluxKleinT2I", auth = "private" }
+# Register fal apps here, e.g.:
+# klein-4b = { ref = "apps/klein_4b/app.py::Klein4B", auth = "private" }
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

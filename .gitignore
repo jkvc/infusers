@@ -12,19 +12,32 @@ build/
 .venv/
 venv/
 
+# uv
+# uv.lock is committed for reproducibility (like pnpm-lock.yaml)
+
 # Environment / secrets
 .env
-.env.*
+.env.local
+.env.*.local
+!.env.example
 
 # OS
 .DS_Store
 Thumbs.db
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 
 # fal
 .fal/
+
+# Ruff
+.ruff_cache/
+
+# pytest
+.pytest_cache/
