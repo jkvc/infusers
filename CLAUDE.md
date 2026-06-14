@@ -64,4 +64,4 @@ Do **not** hard-wrap paragraphs in Markdown. Write each paragraph / list item as
 
 ### 10. Testing
 
-Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for fal glue and config-only changes where they add no signal.
+Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for fal glue and config-only changes where they add no signal.

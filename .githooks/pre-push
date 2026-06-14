@@ -1,7 +1,47 @@
 #!/bin/sh
-set -e
 
 cd "$(git rev-parse --show-toplevel)"
 
-echo "Running pytest..."
-uv run pytest
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+echo "Running checks in parallel..."
+
+uv run ruff check . > "$tmpdir/ruff.log" 2>&1 &
+pid_ruff=$!
+uv run black --check . > "$tmpdir/black.log" 2>&1 &
+pid_black=$!
+uv run pytest > "$tmpdir/pytest.log" 2>&1 &
+pid_pytest=$!
+
+failed=0
+
+if ! wait $pid_ruff; then
+  echo "Ruff failed:"
+  cat "$tmpdir/ruff.log"
+  failed=1
+else
+  echo "  ok ruff"
+fi
+
+if ! wait $pid_black; then
+  echo "Black failed:"
+  cat "$tmpdir/black.log"
+  failed=1
+else
+  echo "  ok black"
+fi
+
+if ! wait $pid_pytest; then
+  echo "Pytest failed:"
+  cat "$tmpdir/pytest.log"
+  failed=1
+else
+  echo "  ok pytest"
+fi
+
+if [ $failed -eq 1 ]; then
+  exit 1
+fi
+
+echo "All checks passed."
