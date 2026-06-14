@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fal",
+    "flux",
+    "click>=8",
+    "pillow>=10",
 ]
 
 [dependency-groups]
@@ -14,6 +17,16 @@ dev = [
     "pytest>=8",
     "ruff>=0.9",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
+[tool.uv.sources]
+flux = { git = "https://github.com/black-forest-labs/flux2.git" }
+torch = { index = "pytorch-cu129" }
+torchvision = { index = "pytorch-cu129" }
 
 [build-system]
 requires = ["hatchling"]

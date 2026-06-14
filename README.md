@@ -10,6 +10,7 @@ One weight load, many parametrized modes (plain t2i, MultiDiffusion, panorama, t
 infusers/
 ├── infusers/     # Core inferencer logic (platform-agnostic)
 ├── apps/         # fal.App deployments (added as endpoints ship)
+├── scripts/      # Local dev scripts (e.g. Klein smoke tests)
 ├── tests/
 └── notes/
 ```
@@ -17,8 +18,9 @@ infusers/
 ## Prerequisites
 
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
-- A [fal.ai](https://fal.ai) account
+- [uv](https://docs.astral.sh/uv/) — install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- NVIDIA GPU + CUDA driver (for local Klein inference)
+- A [fal.ai](https://fal.ai) account (for deployments only)
 
 ## Local setup
 
@@ -31,6 +33,13 @@ uv run fal auth login
 # Enable the pre-push hook (once per clone)
 git config core.hooksPath .githooks
 ```
+
+`uv sync` installs everything: fal CLI, BFL flux2, torch (~3 GB of CUDA wheels), and dev tools. One venv at `.venv/`.
+
+Hugging Face auth for gated VAE weights (`FLUX.2-dev`):
+
+1. Accept the license at [FLUX.2-dev](https://huggingface.co/black-forest-labs/FLUX.2-dev)
+2. `uv run hf auth login` (read token; saved to `~/.cache/huggingface/token`)
 
 Copy env template and fill in values (gitignored):
 
@@ -48,7 +57,8 @@ uv run fal secret set HF_TOKEN hf_xxxxxxxx   # when a gated model is deployed
 
 | Command | Description |
 | --- | --- |
-| `uv sync` | Install / update dependencies |
+| `uv sync` | Install / update all dependencies |
+| `uv run hf auth login` | Hugging Face auth for gated model downloads |
 | `uv run fal auth login` | Authenticate fal CLI |
 | `uv run fal run <app>` | Ephemeral deployment (dev test) |
 | `uv run fal deploy <app>` | Persistent private deployment |
@@ -70,7 +80,8 @@ Shared inferencer code belongs in the `infusers` package, not duplicated across 
 | Variable | Where | Description |
 | --- | --- | --- |
 | `FAL_KEY` | Local `.env` | API key for calling private fal endpoints (`key_id:key_secret`) |
-| `HF_TOKEN` | `fal secret set` + `.env` | Hugging Face read token for gated model weights on workers |
+| `HF_TOKEN` | `fal secret set` + `.env` | Hugging Face read token for gated weights on fal workers |
+| *(local Klein)* | `hf auth login` | Preferred for local runs; token in `~/.cache/huggingface/token` |
 
 ## jkvc integration
 
