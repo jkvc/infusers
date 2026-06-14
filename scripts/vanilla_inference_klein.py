@@ -117,6 +117,7 @@ def load_pipeline(
     width: int,
     height: int,
     cpu_offload: bool,
+    ref_image_paths: tuple[Path, ...] = (),
 ) -> KleinPipeline:
     model_name = model_name.lower()
     model_info = FLUX2_MODEL_INFO[model_name]
@@ -134,8 +135,9 @@ def load_pipeline(
     ae.eval()
     text_encoder.eval()
 
+    ref_images = [Image.open(path).convert("RGB") for path in ref_image_paths]
     with torch.no_grad():
-        ref_tokens, ref_ids = encode_image_refs(ae, [])
+        ref_tokens, ref_ids = encode_image_refs(ae, ref_images)
 
     return KleinPipeline(
         model_name=model_name,
@@ -300,6 +302,14 @@ def generate_one(pipe: KleinPipeline, prompt: str, seed: int) -> Image.Image:
     is_flag=True,
     help="Load flow model on CPU and move to GPU per inference (helps tight VRAM).",
 )
+@click.option(
+    "--ref-image",
+    "-r",
+    "ref_images",
+    multiple=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Reference image(s) for i2i / editing. Pass -r once per image.",
+)
 def main(
     prompts: tuple[str, ...],
     output_dir: Path,
@@ -308,6 +318,7 @@ def main(
     width: int,
     height: int,
     cpu_offload: bool,
+    ref_images: tuple[Path, ...],
 ) -> None:
     if not torch.cuda.is_available():
         raise click.ClickException("CUDA is required for Klein inference.")
@@ -322,7 +333,13 @@ def main(
     t0 = time.perf_counter()
 
     load_start = time.perf_counter()
-    pipe = load_pipeline(model_name, width=width, height=height, cpu_offload=cpu_offload)
+    pipe = load_pipeline(
+        model_name,
+        width=width,
+        height=height,
+        cpu_offload=cpu_offload,
+        ref_image_paths=ref_images,
+    )
     load_s = time.perf_counter() - load_start
     click.echo(f"load: {load_s:.2f}s")
 
@@ -361,6 +378,7 @@ def main(
             "height": height,
             "seed_base": seed,
             "cpu_offload": cpu_offload,
+            "ref_images": [str(p.resolve()) for p in ref_images],
             "prompt_count": len(prompts),
             "output_dir": str(output_dir.resolve()),
             "gpu": _gpu_info(),
