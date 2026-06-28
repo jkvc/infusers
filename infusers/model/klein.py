@@ -10,7 +10,11 @@ import torch.nn as nn
 from flux2.text_encoder import Qwen3Embedder
 from flux2.util import FLUX2_MODEL_INFO, load_ae, load_flow_model, load_text_encoder
 
-from infusers.model.weights import FLOW_FILENAME, resolve_hf_home, resolve_weights_dir
+from infusers.model.weights import (
+    flow_filename_for_model,
+    resolve_hf_home,
+    resolve_weights_dir,
+)
 
 _AE_FILENAME = "ae.safetensors"
 _FP8_MIN_CAPABILITY = (8, 9)
@@ -25,14 +29,17 @@ def _qwen_variant_for_model(model_name: str) -> str:
     raise ValueError(f"No Qwen3 fallback mapping for model {model_name!r}")
 
 
-def _configure_preseeded_weights(weights_dir: Path) -> None:
-    flow_path = weights_dir / FLOW_FILENAME
+def _configure_preseeded_weights(weights_dir: Path, model_name: str) -> None:
+    model_info = FLUX2_MODEL_INFO[model_name.lower()]
+    flow_filename = model_info["filename"]
+    model_path_env = model_info["model_path"]
+    flow_path = weights_dir / flow_filename
     ae_path = weights_dir / _AE_FILENAME
     missing = [path for path in (flow_path, ae_path) if not path.is_file()]
     if missing:
         missing_list = "\n".join(f"  - {path}" for path in missing)
         raise FileNotFoundError(f"Pre-seeded Klein weights not found:\n{missing_list}")
-    os.environ["KLEIN_9B_MODEL_PATH"] = str(flow_path)
+    os.environ[model_path_env] = str(flow_path)
     os.environ["AE_MODEL_PATH"] = str(ae_path)
 
 
@@ -78,8 +85,11 @@ class KleinModel(nn.Module):
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is required for KleinModel")
 
-        ckpt_dir = resolve_weights_dir(weights_dir)
-        _configure_preseeded_weights(ckpt_dir)
+        ckpt_dir = resolve_weights_dir(
+            weights_dir,
+            flow_filename=flow_filename_for_model(model_name),
+        )
+        _configure_preseeded_weights(ckpt_dir, model_name.lower())
 
         hf_root = resolve_hf_home(hf_home)
         if hf_root is not None:

@@ -1,4 +1,4 @@
-"""Klein 9B on Modal — generic runner with Volume-backed weights."""
+"""Klein 9B-KV on Modal — generic runner with Volume-backed weights."""
 
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ import modal
 
 from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
 from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
+
+from infusers.model.weights import FLOW_FILENAME_KV
 
 APP_NAME = "lunas-courageous-adventure"
 STREAM_LABEL = f"{APP_NAME}-stream"
@@ -57,7 +59,7 @@ class LunasCourageousAdventure(GenericModelRunner):
     ROUTES = [
         RouteDef(
             path="klein9b.image",
-            recipe="quant/flux/klein9b/image_basic",
+            recipe="quant/flux/klein9bkv/image_basic",
             output_key="image",
             intermediate_translators=[GetAttr("message")],
             final_translators=[GetAttr("image"), TensorToWebpB64()],
@@ -75,9 +77,11 @@ class LunasCourageousAdventure(GenericModelRunner):
         os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
         ckpt = WEIGHTS_MOUNT / "klein-9b" / "klein-9b"
-        if not ckpt.is_dir():
+        kv_flow = ckpt / FLOW_FILENAME_KV
+        if not kv_flow.is_file():
             raise FileNotFoundError(
-                f"Missing weights at {ckpt}. Run ./scripts/upload_weights.sh from your machine."
+                f"Missing KV weights at {kv_flow}. "
+                "Run ./scripts/stage_weights.sh && ./scripts/upload_weights.sh from your machine."
             )
 
         self.init_routes()

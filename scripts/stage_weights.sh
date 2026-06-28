@@ -27,9 +27,11 @@ mkdir -p "$ckpt_dir" "$hf_home"
 
 echo "==> Copying Klein 9B flow + VAE from local HF cache ..."
 klein_wt=$(resolve_hf_blob "$HOME/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-klein-9B/snapshots/"*/flux-2-klein-9b.safetensors)
+klein_kv_wt=$(resolve_hf_blob "$HOME/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-klein-9B-kv/snapshots/"*/flux-2-klein-9b-kv.safetensors)
 ae_wt=$(resolve_hf_blob "$HOME/.cache/huggingface/hub/models--black-forest-labs--FLUX.2-dev/snapshots/"*/ae.safetensors)
 
 cp -L "$klein_wt" "$ckpt_dir/flux-2-klein-9b.safetensors"
+cp -L "$klein_kv_wt" "$ckpt_dir/flux-2-klein-9b-kv.safetensors"
 cp -L "$ae_wt" "$ckpt_dir/ae.safetensors"
 
 echo "==> Downloading Qwen3-8B-FP8 text encoder into staged HF_HOME ..."
