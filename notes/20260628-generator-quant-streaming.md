@@ -94,14 +94,16 @@ Base64 in logs is summarized as `{ kind, chars, bytes }` — never inlined.
 
 ## Deployed apps
 
-| App | Path | JSON endpoint | Stream endpoint |
+| App | Path | JSON (`label=APP_NAME`) | Stream (`label={APP_NAME}-stream`) |
 | --- | --- | --- | --- |
-| `dummy_image.py` | `dummy.image` | `…infusers-dummy-image-dummyimagerunner-web.modal.run` | `…--stream.modal.run` (label `stream`) |
-| `lunas_courageous_adventure.py` | `klein9b.image` | `…lunas-courageous-adventure-…modal.run` | `…--klein-stream.modal.run` (label `klein-stream`) |
+| `dummy_image.py` | `dummy.image` | `…--infusers-dummy-image.modal.run` | `…--infusers-dummy-image-stream.modal.run` |
+| `lunas_courageous_adventure.py` | `klein9b.image` | `…--lunas-courageous-adventure.modal.run` | `…--lunas-courageous-adventure-stream.modal.run` |
 
-Stream webhook labels must be unique per workspace — Klein uses `klein-stream` because dummy already took `stream`.
+Each app sets `label=APP_NAME` on `web` and `label=f"{APP_NAME}-stream"` on `web_stream` so URLs are predictable per deploy.
 
 Klein: L40S, Volume weights, `scaledown_window=120`. Dummy: CPU-only, `scaledown_window=60`.
+
+All `web` / `web_stream` endpoints use Modal `requires_proxy_auth=True` — callers need `Modal-Key` and `Modal-Secret` headers ([proxy auth tokens](https://modal.com/settings/proxy-auth-tokens)). Unauthenticated requests return 401 without spinning GPU containers.
 
 ### Cold vs warm (Klein, Jun 2026)
 
@@ -141,7 +143,7 @@ infusers/modal_app/
 ├── base.py           run(), run_stream(), RouteDef translators
 ├── stream.py         bounded queue + SSE
 ├── dummy_image.py    CPU Modal app
-└── lunas_courageous_adventure.py   Klein + web_stream (klein-stream label)
+└── lunas_courageous_adventure.py   Klein — labels APP_NAME / APP_NAME-stream
 
 infusers/configs/quant/image_basic_dummy.yaml
 ```

@@ -65,6 +65,9 @@ uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 | `uv run hf auth login` | Hugging Face auth for gated model downloads |
 | `uv run modal setup` | Authenticate Modal CLI |
 | `uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py` | Deploy Klein 9B |
+| `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke` | CLI smoke (uses `modal setup`, no proxy token) |
+| `./scripts/smoke.sh` | HTTP JSON smoke (needs `.env` proxy token) |
+| `./scripts/smoke_stream.sh` | HTTP SSE smoke (needs `.env`) |
 | `uv run ruff check .` | Lint |
 | `uv run black .` | Format |
 | `uv run pytest` | Unit tests |
@@ -81,12 +84,21 @@ All call sites use `from infusers import QM` — one chokepoint, recipe name is 
 
 ## Environment
 
-| Variable | Where | Description |
-| --- | --- | --- |
-| `MODAL_WEB_URL` | shell | Deployed web endpoint for `./scripts/smoke.sh` |
+Copy `.env.example` → `.env` and fill in proxy token + lunas endpoint URLs (`.env` is gitignored).
 
-Auth: `uv run hf auth login` (Hugging Face) and `uv run modal setup` (Modal) — credentials in `~/.cache/huggingface/token` and `~/.modal.toml` (gitignored).
+**One Modal deploy = two URLs** (JSON + stream). Every route on that app (`klein9b.image`, future paths) shares them — the request body `"path"` picks the recipe. Adding a model is a new `RouteDef`, not a new env var. A second deploy (e.g. dummy CPU app) is optional and gets its own URL pair.
 
-## jkvc integration
+| Variable | Description |
+| --- | --- |
+| `MODAL_WEB_URL` | Primary app JSON endpoint (lunas) |
+| `MODAL_STREAM_URL` | Primary app SSE — label `{APP_NAME}-stream` |
+| `MODAL_KEY` | Proxy auth token ID (`wk-…`) |
+| `MODAL_SECRET` | Proxy auth token secret (`ws-…`) |
+| `MODAL_DUMMY_*` | Optional — only if HTTP-smoking `dummy_image.py` |
 
-jkvc will call the private Modal web endpoint (or a future proxy route). See [`notes/20260628-modal-setup.md`](notes/20260628-modal-setup.md) for the current endpoint and [`notes/2026-06-08-kickoff.md`](notes/2026-06-08-kickoff.md) for original architecture context.
+```bash
+cp .env.example .env   # first time only
+./scripts/smoke.sh     # sources .env automatically
+```
+
+Modal CLI auth (`uv run modal setup`) lives in `~/.modal.toml` (gitignored) — separate from proxy tokens. HF auth: `~/.cache/huggingface/token`.

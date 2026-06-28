@@ -29,20 +29,29 @@ uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py
 uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 ```
 
-After deploy, the CLI prints the web URL. Interactive API docs: `<web-url>/docs`.
+After deploy, the CLI prints the web URL (🔑 = proxy auth required). Interactive API docs: `<web-url>/docs` (also requires proxy auth headers).
 
-HTTP smoke (cold + warm timing):
+## Web endpoint auth
+
+All `web` and `web_stream` endpoints use `requires_proxy_auth=True`. Unauthenticated requests get **401** at Modal's edge — no GPU container spins up.
+
+1. Create a [proxy auth token](https://modal.com/settings/proxy-auth-tokens) in your Modal workspace.
+2. Pass `Modal-Key` (token ID) and `Modal-Secret` (token secret) on every HTTP request.
 
 ```bash
-export MODAL_WEB_URL=https://<your-workspace>--lunas-courageous-adventure-<label>.modal.run
+cp .env.example .env   # fill MODAL_KEY / MODAL_SECRET from proxy-auth-tokens settings
 ./scripts/smoke.sh
+./scripts/smoke_stream.sh
 ```
 
 Example infer request:
 
 ```bash
+set -a && source .env && set +a
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
+  -H "Modal-Key: $MODAL_KEY" \
+  -H "Modal-Secret: $MODAL_SECRET" \
   -d '{
     "path": "klein9b.image",
     "inputs": {
@@ -62,13 +71,15 @@ Streaming (SSE) — same request body, POST to the `/stream` endpoint (label var
 {"kind":"result","result":{"image":"<webp b64>"},"metadata":{...}}
 ```
 
-Klein stream URL pattern: `<web-url>-stream.modal.run` (see deploy output).
+Klein stream URL pattern: `<workspace>--lunas-courageous-adventure-stream.modal.run` (label `{APP_NAME}-stream`; see deploy output).
 
 Optional conditional images — caller must supply the input translator:
 
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
+  -H "Modal-Key: $MODAL_KEY" \
+  -H "Modal-Secret: $MODAL_SECRET" \
   -d '{
     "path": "klein9b.image",
     "inputs": {
@@ -88,6 +99,8 @@ Introspection (`__DESCRIBE__`):
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
+  -H "Modal-Key: $MODAL_KEY" \
+  -H "Modal-Secret: $MODAL_SECRET" \
   -d '{"path": "__DESCRIBE__"}' | jq .
 ```
 
@@ -145,7 +158,8 @@ Code-only deploys are fast (small image). Weights mount from Volume at container
 | `infusers/__init__.py` | `QM = QuantManager(configs)` chokepoint |
 | `scripts/stage_weights.sh` | Stage weights locally |
 | `scripts/upload_weights.sh` | Upload to Modal Volume |
-| `scripts/smoke.sh` | HTTP timing smoke test |
+| `scripts/smoke.sh` | HTTP JSON cold/warm + describe (needs `.env`) |
+| `scripts/smoke_stream.sh` | HTTP SSE stream smoke (needs `.env`) |
 
 ## Runtime behavior
 

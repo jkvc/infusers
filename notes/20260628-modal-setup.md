@@ -36,10 +36,17 @@ Loader: `QM.build("quant/flux/klein9b/image_basic")` in setup with `HF_HUB_OFFLI
 
 ## Deployed endpoints
 
-- **Web API:** `https://kevinehc--lunas-courageous-adventure-lunascourageousadve-93e216.modal.run`
-- **Swagger:** same URL + `/docs`
+Labels: `web` = `APP_NAME`, `web_stream` = `{APP_NAME}-stream`. Requires proxy auth (`Modal-Key` / `Modal-Secret`); see [`docs/modal.md`](../docs/modal.md).
 
-POST JSON — see [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md) for request/response shape. Path: `klein9b.image`.
+| Endpoint | URL |
+| --- | --- |
+| JSON | `https://kevinehc--lunas-courageous-adventure.modal.run` |
+| SSE stream | `https://kevinehc--lunas-courageous-adventure-stream.modal.run` |
+| Swagger | JSON URL + `/docs` |
+
+HTTP smoke: `./scripts/smoke.sh` and `./scripts/smoke_stream.sh` (`.env` from `.env.example`).
+
+POST JSON — see [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md). Path: `klein9b.image`. Streaming: [`20260628-generator-quant-streaming.md`](20260628-generator-quant-streaming.md).
 
 ## Runtime settings
 

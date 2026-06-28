@@ -146,7 +146,7 @@ POST { path, inputs, translator? }
 | `tests/modal_app/test_runner.py` | dispatch, describe, stream, translator enforcement |
 | `tests/modal_app/test_modal_e2e.py` | deploy dummy runner (`pytest -m modal`) — see streaming note for HTTP curl validation |
 
-Smoke entrypoints: Klein — `smoke`, `smoke_cond`, `smoke_describe`. Dummy — `smoke`, `smoke_stream`, `smoke_describe`. HTTP smoke: `./scripts/smoke.sh` (needs `MODAL_WEB_URL`).
+Smoke entrypoints: Klein — `smoke`, `smoke_cond`, `smoke_describe`. Dummy — `smoke`, `smoke_stream`, `smoke_describe`. HTTP: `./scripts/smoke.sh`, `./scripts/smoke_stream.sh` (`.env` + proxy token).
 
 ## Breaking change from prior Modal API
 

@@ -14,6 +14,7 @@ from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
 from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
 
 APP_NAME = "lunas-courageous-adventure"
+STREAM_LABEL = f"{APP_NAME}-stream"
 VOLUME_NAME = "jkvc-klein-9b-weights"
 WEIGHTS_MOUNT = Path("/weights")
 HF_HOME = WEIGHTS_MOUNT / "klein-9b" / "hf"
@@ -91,7 +92,7 @@ class LunasCourageousAdventure(GenericModelRunner):
     def run_stream_remote(self, body: dict[str, Any]) -> list[str]:
         return list(self.run_stream(body))
 
-    @modal.fastapi_endpoint(method="POST", docs=True)
+    @modal.fastapi_endpoint(method="POST", docs=True, label=APP_NAME, requires_proxy_auth=True)
     def web(self, item: dict[str, Any]):
         from fastapi import HTTPException
         from fastapi.responses import JSONResponse
@@ -101,7 +102,7 @@ class LunasCourageousAdventure(GenericModelRunner):
         except RunnerError as exc:
             raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
-    @modal.fastapi_endpoint(method="POST", docs=True, label="klein-stream")
+    @modal.fastapi_endpoint(method="POST", docs=True, label=STREAM_LABEL, requires_proxy_auth=True)
     def web_stream(self, item: dict[str, Any]):
         from fastapi import HTTPException
         from fastapi.responses import StreamingResponse
