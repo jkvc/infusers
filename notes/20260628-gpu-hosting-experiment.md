@@ -29,7 +29,7 @@ Cold slowness was almost entirely **OCI image pull** (~30GB), not Python setup (
 
 ### Modal (chosen)
 
-**App:** `jkvc-klein-9b` — L40S, Volume-mounted weights, custom `infusers.klein` flux2 stack.
+**App:** `lunas-courageous-adventure` — L40S, Volume-mounted weights, custom `infusers.model.klein` flux2 stack.
 
 | Run | Wall time | Notes |
 | --- | --- | --- |
@@ -44,6 +44,6 @@ Weights live on Modal Volume `jkvc-klein-9b-weights`; image is code-only. Cold b
 
 ## Decision
 
-**Modal** for Klein 9B inference: custom Python, Volume weights, ~4× faster cold boot than Replicate bundled, acceptable cost for ~300 calls/month. Implementation lives in `apps/klein_9b/`; ops in [`docs/modal.md`](../docs/modal.md).
+**Modal** for Klein 9B inference: custom Python, Volume weights, ~4× faster cold boot than Replicate bundled, acceptable cost for ~300 calls/month. Model in `infusers/model/klein.py`, deploy in `infusers/modal_app/lunas_courageous_adventure.py`; ops in [`docs/modal.md`](../docs/modal.md).
 
 Historical context for fal/Replicate only — not maintained deploy paths in this repo.

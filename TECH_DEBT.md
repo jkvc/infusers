@@ -8,11 +8,11 @@ Known shortcuts and deferred work. Record every conscious shortcut here; delete 
 
 **Added:** 2026-06-08 (updated 2026-06-28)
 
-**What:** Only Klein 9B smoke inference is deployed on Modal (`apps/klein_9b/`). Klein 4B public / 9B-KV demo split from kickoff note is not built yet.
+**What:** Only Klein 9B smoke inference is deployed on Modal (`infusers/modal_app/lunas_courageous_adventure.py`). Klein 4B public / 9B-KV demo split from kickoff note is not built yet.
 
 **Why:** Hosting experiment prioritized 9B cold-boot validation before multi-endpoint rollout.
 
-**Fix:** Add `apps/klein_4b/` (or similar) per `notes/2026-06-08-kickoff.md` once inferencer modes land.
+**Fix:** Add another `infusers/modal_app/*.py` per `notes/2026-06-08-kickoff.md` once inferencer modes land.
 
 ### Ampere GPUs use bf16 Qwen3 text encoder in vanilla script
 

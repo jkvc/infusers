@@ -43,12 +43,12 @@ def configure_preseeded_weights(weights_dir: Path | str = DEFAULT_WEIGHTS_DIR) -
 
 
 @dataclass
-class KleinPipeline:
+class Klein:
     model_name: str
     model_info: dict
     device: torch.device
     text_encoder: torch.nn.Module
-    model: torch.nn.Module
+    flow: torch.nn.Module
     ae: torch.nn.Module
     num_steps: int
     guidance: float
@@ -58,14 +58,14 @@ class KleinPipeline:
     ref_ids: torch.Tensor | None
 
 
-def load_pipeline(
+def load(
     model_name: str = "flux.2-klein-9b",
     *,
     width: int = 1024,
     height: int = 1024,
     weights_dir: Path | str | None = DEFAULT_WEIGHTS_DIR,
     ref_images: list[Image.Image] | None = None,
-) -> KleinPipeline:
+) -> Klein:
     if weights_dir is not None:
         configure_preseeded_weights(weights_dir)
 
@@ -75,10 +75,10 @@ def load_pipeline(
     device = torch.device("cuda")
 
     text_encoder = load_text_encoder(model_name, device=device)
-    model = load_flow_model(model_name, device=device)
+    flow = load_flow_model(model_name, device=device)
     ae = load_ae(model_name, device=device)
     text_encoder.eval()
-    model.eval()
+    flow.eval()
     ae.eval()
 
     ref_tokens = None
@@ -87,12 +87,12 @@ def load_pipeline(
         with torch.no_grad():
             ref_tokens, ref_ids = encode_image_refs(ae, ref_images)
 
-    return KleinPipeline(
+    return Klein(
         model_name=model_name,
         model_info=model_info,
         device=device,
         text_encoder=text_encoder,
-        model=model,
+        flow=flow,
         ae=ae,
         num_steps=defaults.get("num_steps", 50),
         guidance=defaults.get("guidance", 4.0),
@@ -104,11 +104,11 @@ def load_pipeline(
 
 
 @torch.no_grad()
-def generate_image(pipe: KleinPipeline, prompt: str, seed: int) -> Image.Image:
-    text_encoder = pipe.text_encoder
-    model = pipe.model
+def generate_image(klein: Klein, prompt: str, seed: int) -> Image.Image:
+    text_encoder = klein.text_encoder
+    flow = klein.flow
 
-    if pipe.model_info["guidance_distilled"]:
+    if klein.model_info["guidance_distilled"]:
         ctx = text_encoder([prompt]).to(torch.bfloat16)
     else:
         ctx_empty = text_encoder([""]).to(torch.bfloat16)
@@ -116,44 +116,44 @@ def generate_image(pipe: KleinPipeline, prompt: str, seed: int) -> Image.Image:
         ctx = torch.cat([ctx_empty, ctx_prompt], dim=0)
     ctx, ctx_ids = batched_prc_txt(ctx)
 
-    shape = (1, 128, pipe.height // 16, pipe.width // 16)
-    generator = torch.Generator(device=pipe.device).manual_seed(seed)
-    randn = torch.randn(shape, generator=generator, dtype=torch.bfloat16, device=pipe.device)
+    shape = (1, 128, klein.height // 16, klein.width // 16)
+    generator = torch.Generator(device=klein.device).manual_seed(seed)
+    randn = torch.randn(shape, generator=generator, dtype=torch.bfloat16, device=klein.device)
     x, x_ids = batched_prc_img(randn)
 
-    timesteps = get_schedule(pipe.num_steps, x.shape[1])
-    if pipe.model_info["guidance_distilled"]:
+    timesteps = get_schedule(klein.num_steps, x.shape[1])
+    if klein.model_info["guidance_distilled"]:
         denoise_fn = (
             denoise_cached
-            if (pipe.model_info.get("use_kv_cache") and pipe.ref_tokens is not None)
+            if (klein.model_info.get("use_kv_cache") and klein.ref_tokens is not None)
             else denoise
         )
         x = denoise_fn(
-            model,
+            flow,
             x,
             x_ids,
             ctx,
             ctx_ids,
             timesteps=timesteps,
-            guidance=pipe.guidance,
-            img_cond_seq=pipe.ref_tokens,
-            img_cond_seq_ids=pipe.ref_ids,
+            guidance=klein.guidance,
+            img_cond_seq=klein.ref_tokens,
+            img_cond_seq_ids=klein.ref_ids,
         )
     else:
         x = denoise_cfg(
-            model,
+            flow,
             x,
             x_ids,
             ctx,
             ctx_ids,
             timesteps=timesteps,
-            guidance=pipe.guidance,
-            img_cond_seq=pipe.ref_tokens,
-            img_cond_seq_ids=pipe.ref_ids,
+            guidance=klein.guidance,
+            img_cond_seq=klein.ref_tokens,
+            img_cond_seq_ids=klein.ref_ids,
         )
 
     x = torch.cat(scatter_ids(x, x_ids)).squeeze(2)
-    x = pipe.ae.decode(x).float()
+    x = klein.ae.decode(x).float()
     x = x.clamp(-1, 1)
     x = rearrange(x[0], "c h w -> h w c")
     return Image.fromarray((127.5 * (x + 1.0)).cpu().byte().numpy())

@@ -33,8 +33,8 @@ This project uses **uv**. Never use bare `pip install` outside the uv-managed en
 Modal is a **dev dependency**. Always run `uv run modal …`, not bare `modal`.
 
 - `uv run modal setup` — one-time local auth
-- `uv run modal deploy apps/<name>/app.py` — deploy app
-- `uv run modal run apps/<name>/app.py::<fn>` — run a local entrypoint against deployed infra
+- `uv run modal deploy infusers/modal_app/<name>.py` — deploy app
+- `uv run modal run infusers/modal_app/<name>.py::<fn>` — run a local entrypoint against deployed infra
 
 See [`docs/modal.md`](docs/modal.md) for staging weights, Volume upload, and smoke tests.
 
@@ -42,17 +42,18 @@ See [`docs/modal.md`](docs/modal.md) for staging weights, Volume upload, and smo
 
 ```
 infusers/
-├── infusers/          # Core inferencer logic (platform-agnostic Python)
-├── apps/              # Modal deployments (one directory per endpoint)
+├── infusers/
+│   ├── model/         # Model implementations (klein, …)
+│   └── modal_app/     # Modal deploy modules (one file per deployed app)
 ├── docs/              # Operational guides (e.g. modal.md)
 ├── scripts/           # Weight staging, upload, smoke tests
 ├── tests/             # pytest
 └── notes/             # Design notes (yyyymmdd-slug.md)
 ```
 
-- **Heavy imports** (`torch`, `diffusers`, etc.) belong inside `@modal.enter()` or endpoint methods in Modal apps, not at module level in apps that only need the Modal CLI locally.
+- **Heavy imports** (`torch`, `diffusers`, etc.) belong inside `@modal.enter()` or endpoint methods in Modal apps, not at module level in deploy modules that only need the Modal CLI locally.
 - **Pin dependency versions** in Modal image `pip_install` lists for reproducible remote builds.
-- **Share code** between apps via the `infusers` package (`add_local_python_source`) — not ad-hoc copies.
+- **Share code** between deploy modules via `infusers.model` (`add_local_python_source("infusers")`) — not ad-hoc copies.
 
 ### 7. Model Loading Convention
 

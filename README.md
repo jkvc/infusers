@@ -8,10 +8,11 @@ One weight load, many parametrized modes (plain t2i, MultiDiffusion, panorama, t
 
 ```
 infusers/
-├── infusers/     # Core inferencer logic (platform-agnostic)
-├── apps/         # Modal deployments (one directory per endpoint)
-├── docs/         # Operational guides (e.g. modal.md)
-├── scripts/      # Weight staging, upload, smoke tests
+├── infusers/
+│   ├── model/       # Model implementations (klein, …)
+│   └── modal_app/   # Modal deploy modules (one file per deployed app)
+├── docs/            # Operational guides (e.g. modal.md)
+├── scripts/         # Weight staging, upload, smoke tests
 ├── tests/
 └── notes/
 ```
@@ -49,8 +50,8 @@ Full guide: [`docs/modal.md`](docs/modal.md).
 ```bash
 ./scripts/stage_weights.sh       # one-time, ~27GB local
 ./scripts/upload_weights.sh      # one-time, → Modal Volume
-uv run modal deploy apps/klein_9b/app.py
-uv run modal run apps/klein_9b/app.py::smoke
+uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py
+uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 ```
 
 ## Commands
@@ -60,17 +61,17 @@ uv run modal run apps/klein_9b/app.py::smoke
 | `uv sync --dev` | Install / update all dependencies |
 | `uv run hf auth login` | Hugging Face auth for gated model downloads |
 | `uv run modal setup` | Authenticate Modal CLI |
-| `uv run modal deploy apps/klein_9b/app.py` | Deploy Klein 9B |
+| `uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py` | Deploy Klein 9B |
 | `uv run ruff check .` | Lint |
 | `uv run black .` | Format |
 | `uv run pytest` | Unit tests |
 
 ## Adding a Modal app
 
-1. Create `apps/<name>/app.py` with a `modal.App` and `@app.cls` / endpoints.
-2. Share inferencer code via `infusers` (`add_local_python_source("infusers")` in the image).
-3. Test: `uv run modal run apps/<name>/app.py::<entrypoint>`
-4. Deploy: `uv run modal deploy apps/<name>/app.py`
+1. Create `infusers/modal_app/<name>.py` with a `modal.App` and `@app.cls` / endpoints.
+2. Import model code from `infusers.model.*` (`add_local_python_source("infusers")` in the image).
+3. Test: `uv run modal run infusers/modal_app/<name>.py::<entrypoint>`
+4. Deploy: `uv run modal deploy infusers/modal_app/<name>.py`
 
 ## Environment
 

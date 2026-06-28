@@ -1,4 +1,7 @@
-"""Klein 9B text-to-image on Modal — Volume-backed weights, custom flux2 stack."""
+"""Klein 9B on Modal — Volume-backed weights, custom flux2 stack.
+
+Named for future multi-model / multi-app deployments; currently hosts Klein 9B only.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from pathlib import Path
 
 import modal
 
-APP_NAME = "jkvc-klein-9b"
+APP_NAME = "lunas-courageous-adventure"
 VOLUME_NAME = "jkvc-klein-9b-weights"
 WEIGHTS_MOUNT = Path("/weights")
 KLEIN_CKPT_DIR = WEIGHTS_MOUNT / "klein-9b" / "klein-9b"
@@ -44,12 +47,12 @@ app = modal.App(APP_NAME, image=image)
     scaledown_window=120,  # keep GPU warm 2 min after last request
     timeout=600,
 )
-class Klein9B:
+class LunasCourageousAdventure:
     @modal.enter()
     def setup(self) -> None:
         import torch
 
-        from infusers.klein import generate_image, load_pipeline
+        from infusers.model.klein import generate_image, load
 
         t0 = time.perf_counter()
         os.environ["HF_HOME"] = str(HF_HOME)
@@ -67,13 +70,13 @@ class Klein9B:
                 )
 
         print(f"Loading Klein 9B from {KLEIN_CKPT_DIR} ...")
-        self.pipe = load_pipeline(
+        self.klein = load(
             "flux.2-klein-9b",
             width=1024,
             height=1024,
             weights_dir=KLEIN_CKPT_DIR,
         )
-        _ = generate_image(self.pipe, "solid gray", seed=0)
+        _ = generate_image(self.klein, "solid gray", seed=0)
         torch.cuda.synchronize()
         print(f"Klein 9B ready in {time.perf_counter() - t0:.1f}s")
 
@@ -85,11 +88,11 @@ class Klein9B:
         width: int = 1024,
         height: int = 1024,
     ) -> bytes:
-        from infusers.klein import generate_image
+        from infusers.model.klein import generate_image
 
-        self.pipe.width = width
-        self.pipe.height = height
-        image = generate_image(self.pipe, prompt, seed=seed)
+        self.klein.width = width
+        self.klein.height = height
+        image = generate_image(self.klein, prompt, seed=seed)
         buf = io.BytesIO()
         image.save(buf, format="JPEG", quality=95)
         return buf.getvalue()
@@ -108,8 +111,8 @@ class Klein9B:
 
 @app.local_entrypoint()
 def smoke(prompt: str = "solid red square on white background", seed: int = 42) -> None:
-    """CLI smoke test: uv run modal run apps/klein_9b/app.py::smoke"""
-    service = Klein9B()
+    """CLI smoke test: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke"""
+    service = LunasCourageousAdventure()
     t0 = time.perf_counter()
     jpeg = service.infer.remote(prompt, seed=seed, width=512, height=512)
     elapsed = time.perf_counter() - t0

@@ -5,8 +5,8 @@ Current production path for Klein 9B smoke inference. Operational commands: [`do
 ## Workspace
 
 - **Modal profile:** `kevinehc` (token in `~/.modal.toml`, gitignored)
-- **App name:** `jkvc-klein-9b`
-- **Dashboard:** https://modal.com/apps/kevinehc/main/deployed/jkvc-klein-9b
+- **App name:** `lunas-courageous-adventure`
+- **Dashboard:** https://modal.com/apps/kevinehc/main/deployed/lunas-courageous-adventure
 
 ## Architecture
 
@@ -30,11 +30,11 @@ POST web endpoint → JPEG
 | `/weights/klein-9b/klein-9b/` | `flux-2-klein-9b.safetensors`, `ae.safetensors` |
 | `/weights/klein-9b/hf/` | HF hub cache for `Qwen/Qwen3-8B-FP8` |
 
-Loader: `infusers.klein.load_pipeline` with `HF_HUB_OFFLINE=1`.
+Loader: `infusers.model.klein.load` with `HF_HUB_OFFLINE=1`.
 
 ## Deployed endpoints
 
-- **Web API:** `https://kevinehc--jkvc-klein-9b-klein9b-web.modal.run`
+- **Web API:** `https://kevinehc--lunas-courageous-adventure-lunascourageousadve-93e216.modal.run`
 - **Swagger:** same URL + `/docs`
 
 POST JSON: `{"prompt": "...", "seed": 42, "width": 512, "height": 512}` → JPEG bytes.

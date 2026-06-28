@@ -2,7 +2,7 @@
 # Cold + warm timing smoke test against deployed Modal web endpoint.
 #
 # Usage:
-#   MODAL_WEB_URL=https://<workspace>--jkvc-klein-9b-klein9b-web.modal.run ./scripts/smoke.sh
+#   MODAL_WEB_URL=https://<workspace>--lunas-courageous-adventure-<label>.modal.run ./scripts/smoke.sh
 set -euo pipefail
 
 URL="${MODAL_WEB_URL:?Set MODAL_WEB_URL to your @modal.fastapi_endpoint URL}"
