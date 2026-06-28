@@ -19,7 +19,6 @@ venv/
 .env
 .env.local
 .env.*.local
-!.env.example
 
 # OS
 .DS_Store
@@ -33,8 +32,8 @@ Thumbs.db
 *.swp
 *.swo
 
-# fal
-.fal/
+# Modal (local auth)
+.modal.toml
 
 # Ruff
 .ruff_cache/
@@ -44,3 +43,9 @@ Thumbs.db
 
 # Local inference outputs
 .model-out/
+
+# Staged / uploaded model weights
+weights/
+
+# Legacy local tooling (Replicate Cog experiments)
+.cog/

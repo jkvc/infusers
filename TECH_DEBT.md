@@ -4,15 +4,15 @@ Known shortcuts and deferred work. Record every conscious shortcut here; delete 
 
 ## Active
 
-### Legacy fal app removed during repo reset
+### Klein 4B public endpoint not yet deployed
 
-**Added:** 2026-06-08
+**Added:** 2026-06-08 (updated 2026-06-28)
 
-**What:** The old `apps/flux_klein_t2i` prototype (diffusers `Flux2KleinPipeline` on 9B with wrong distilled defaults) was deleted. No fal apps are registered yet.
+**What:** Only Klein 9B smoke inference is deployed on Modal (`apps/klein_9b/`). Klein 4B public / 9B-KV demo split from kickoff note is not built yet.
 
-**Why:** Repo reset to minimal scaffold before rebuilding inferencer-first architecture on fal.
+**Why:** Hosting experiment prioritized 9B cold-boot validation before multi-endpoint rollout.
 
-**Fix:** Add new apps under `apps/` with correct Klein 4B public / 9B-KV demo split per `notes/2026-06-08-kickoff.md`.
+**Fix:** Add `apps/klein_4b/` (or similar) per `notes/2026-06-08-kickoff.md` once inferencer modes land.
 
 ### Ampere GPUs use bf16 Qwen3 text encoder in vanilla script
 

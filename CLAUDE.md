@@ -4,7 +4,7 @@ Guidance for AI assistants working in this repo.
 
 ## Project Overview
 
-**infusers** — custom ML inference for jkvc: inferencer logic (MultiDiffusion, panorama, tiled modes, etc.) and private [fal.ai](https://fal.ai) serverless GPU deployments. The product is **one weight load, many parametrized algorithms** — not fixed third-party pipelines. See [`notes/`](notes/) for architecture and hosting decisions.
+**infusers** — custom ML inference for jkvc: inferencer logic (MultiDiffusion, panorama, tiled modes, etc.) and private [Modal](https://modal.com) GPU deployments. The product is **one weight load, many parametrized algorithms** — not fixed third-party pipelines. See [`notes/`](notes/) for architecture and hosting decisions. Modal ops: [`docs/modal.md`](docs/modal.md).
 
 ## Important Rules
 
@@ -14,7 +14,7 @@ You are **never allowed** to commit or push any code unless the user explicitly 
 
 ### 2. Never Commit Secrets
 
-Never commit `.env` files, API keys, or tokens. Remote fal workers use `fal secret set`; local reference values go in `.env` (gitignored).
+Never commit `.env` files, API keys, or tokens. Modal auth lives in `~/.modal.toml`; Hugging Face auth via `uv run hf auth login` (`~/.cache/huggingface/token`). Both are gitignored.
 
 ### 3. Keep CLAUDE.md Stable
 
@@ -28,27 +28,31 @@ This project uses **uv**. Never use bare `pip install` outside the uv-managed en
 - Run a command in the venv: `uv run <cmd>`
 - Add a dependency: `uv add <package>` (runtime) or `uv add --dev <package>`
 
-### 5. fal CLI
+### 5. Modal CLI
 
-- `fal auth login` — authenticate locally
-- `fal run <app-name>` — ephemeral deployment (temporary URL, killed on Ctrl+C)
-- `fal deploy <app-name>` — persistent private deployment
-- `fal secret set <KEY> <value>` — secrets for remote workers
-- App names are registered in `pyproject.toml` under `[tool.fal.apps]`
+Modal is a **dev dependency**. Always run `uv run modal …`, not bare `modal`.
+
+- `uv run modal setup` — one-time local auth
+- `uv run modal deploy apps/<name>/app.py` — deploy app
+- `uv run modal run apps/<name>/app.py::<fn>` — run a local entrypoint against deployed infra
+
+See [`docs/modal.md`](docs/modal.md) for staging weights, Volume upload, and smoke tests.
 
 ### 6. Repository Layout
 
 ```
 infusers/
 ├── infusers/          # Core inferencer logic (platform-agnostic Python)
-├── apps/              # fal.App deployments (one directory per endpoint)
+├── apps/              # Modal deployments (one directory per endpoint)
+├── docs/              # Operational guides (e.g. modal.md)
+├── scripts/           # Weight staging, upload, smoke tests
 ├── tests/             # pytest
 └── notes/             # Design notes (yyyymmdd-slug.md)
 ```
 
-- **Heavy imports** (`torch`, `diffusers`, etc.) belong inside `setup()` or endpoint methods in fal apps, not at module level in apps that only need the fal CLI locally.
-- **Pin dependency versions** in each `fal.App` `requirements` list for reproducible remote builds.
-- **Share code** between fal apps via the `infusers` package or `app_files` pointing at repo paths — not ad-hoc copies.
+- **Heavy imports** (`torch`, `diffusers`, etc.) belong inside `@modal.enter()` or endpoint methods in Modal apps, not at module level in apps that only need the Modal CLI locally.
+- **Pin dependency versions** in Modal image `pip_install` lists for reproducible remote builds.
+- **Share code** between apps via the `infusers` package (`add_local_python_source`) — not ad-hoc copies.
 
 ### 7. Model Loading Convention
 
@@ -64,4 +68,4 @@ Do **not** hard-wrap paragraphs in Markdown. Write each paragraph / list item as
 
 ### 10. Testing
 
-Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for fal glue and config-only changes where they add no signal.
+Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for Modal glue and config-only changes where they add no signal.
