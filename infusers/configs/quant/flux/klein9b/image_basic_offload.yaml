@@ -9,4 +9,5 @@ guidance: 1.0
 resolution: [1024, 1024]
 cpu_offload: true
 model:
-  load_flow_on_cpu: true
+  config:
+    load_flow_on_cpu: true

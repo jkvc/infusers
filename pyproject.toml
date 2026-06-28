@@ -8,7 +8,7 @@ dependencies = [
     "flux",
     "click>=8",
     "pillow>=10",
-    "reqm>=0.1.0",
+    "reqm>=0.1.1",
 ]
 
 [dependency-groups]

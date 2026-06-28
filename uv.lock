@@ -689,7 +689,7 @@ requires-dist = [
     { name = "click", specifier = ">=8" },
     { name = "flux", git = "https://github.com/black-forest-labs/flux2.git" },
     { name = "pillow", specifier = ">=10" },
-    { name = "reqm", specifier = ">=0.1.0" },
+    { name = "reqm", specifier = ">=0.1.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1777,15 +1777,15 @@ wheels = [
 
 [[package]]
 name = "reqm"
-version = "0.1.0"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "hydra-core" },
     { name = "overrides" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/1f/64/e5c2fc5d346cc96a3f1b14b5867f3646b2c6efc743cc68d955e187a3ef4f/reqm-0.1.0.tar.gz", hash = "sha256:b24d7521c39711891999a9525522200edf6c1ca042e3c2a43c309d06d7b0cd4f", size = 60383, upload-time = "2026-03-07T06:01:54.53Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/dd/1deff9574936c7d55ca2a31c438f105e71bc03e5d93d9d6939a5404a63cc/reqm-0.1.1.tar.gz", hash = "sha256:a6c86742299ec031c044c0fa6bdb2ea09671bffed24f38bec2dae2f090fa3e27", size = 61863, upload-time = "2026-06-28T12:50:40.174Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/19/6ac4eccaeb03847e1c1e8885d84f51b975f68abfa0d22e7845297ed3c82b/reqm-0.1.0-py3-none-any.whl", hash = "sha256:67ac4945564e6140d8c45649ae120a510fe8e7d8e51c8de7209029f95218c352", size = 11444, upload-time = "2026-03-07T06:01:53.243Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/3a/dd33b3de269047469a23e4d987a01d0b865405138d83924759fce8740622/reqm-0.1.1-py3-none-any.whl", hash = "sha256:56b4fc7896951a28ca4c241a25a27fbc85d7b13eec618a05cf24a06e411b7455", size = 12531, upload-time = "2026-06-28T12:50:39.096Z" },
 ]
 
 [[package]]
