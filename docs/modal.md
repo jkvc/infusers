@@ -55,6 +55,15 @@ curl -X POST "$MODAL_WEB_URL" \
 
 Response shape: `{ "result": { "image": "<webp base64>" }, "metadata": { ... } }`. Decode `result.image` to save a WebP file.
 
+Streaming (SSE) — same request body, POST to the `/stream` endpoint (label varies by deploy). Events:
+
+```json
+{"kind":"progress","message":"denoise step 1/4"}
+{"kind":"result","result":{"image":"<webp b64>"},"metadata":{...}}
+```
+
+Klein stream URL pattern: `<web-url>-stream.modal.run` (see deploy output).
+
 Optional conditional images — caller must supply the input translator:
 
 ```bash
@@ -94,6 +103,18 @@ uv run python -m infusers.scripts.inference_image \
 
 CPU-offload test recipe: `quant/flux/klein9b/image_basic_offload`.
 
+## Dummy runner (CPU, no weights)
+
+Fast e2e / CI path using `quant/image_basic_dummy`:
+
+```bash
+uv run modal deploy infusers/modal_app/dummy_image.py
+uv run modal run infusers/modal_app/dummy_image.py::smoke
+uv run modal run infusers/modal_app/dummy_image.py::smoke_stream
+```
+
+Path: `dummy.image`. Same JSON envelope as Klein; streams progress messages then the final WebP.
+
 ## Day-to-day workflow
 
 | Task | Command |
@@ -115,7 +136,11 @@ Code-only deploys are fast (small image). Weights mount from Volume at container
 | `infusers/modal_app/base.py` | `GenericModelRunner` — route dispatch, describe |
 | `infusers/modal_app/translators/` | Translator classes + input DSL registry |
 | `infusers/model/klein.py` | `KleinModel` — flow, AE, text encoder only |
-| `infusers/quant/flux/image.py` | `FluxImageQuant` — steps, guidance, denoise loop |
+| `infusers/modal_app/dummy_image.py` | CPU dummy runner — cheap e2e |
+| `infusers/modal_app/stream.py` | Bounded progress queue + SSE framing |
+| `infusers/quant/api/base.py` | `TorchQuant`, `IntermediateEvent`, `FinalEvent` |
+| `infusers/quant/api/image_base.py` | `ImageQuant`, `DummyImageQuant`, event types |
+| `infusers/quant/flux/image.py` | `FluxImageQuant` — steps, guidance, streaming denoise loop |
 | `infusers/configs/` | reqm YAML recipes |
 | `infusers/__init__.py` | `QM = QuantManager(configs)` chokepoint |
 | `scripts/stage_weights.sh` | Stage weights locally |

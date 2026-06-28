@@ -1,4 +1,4 @@
-"""End-to-end tests against deployed Modal infrastructure."""
+"""End-to-end tests against deployed Modal infrastructure (dummy CPU runner)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-MODAL_APP = "infusers/modal_app/lunas_courageous_adventure.py"
-KLEIN_PATH = "klein9b.image"
+MODAL_APP = "infusers/modal_app/dummy_image.py"
+DUMMY_PATH = "dummy.image"
 
 
 def _run_modal(args: list[str], timeout: int = 600) -> subprocess.CompletedProcess[str]:
@@ -54,46 +54,45 @@ def deployed_app(require_modal: None) -> None:
 def test_modal_describe(deployed_app: None) -> None:
     result = _run_modal(["run", f"{MODAL_APP}::smoke_describe"], timeout=300)
     assert result.returncode == 0, f"smoke_describe failed:\n{result.stderr}\n{result.stdout}"
-    assert KLEIN_PATH in result.stdout
+    assert DUMMY_PATH in result.stdout
 
 
 def test_modal_infer_smoke(deployed_app: None) -> None:
-    """Example 1: text-to-image, no translator."""
     result = _run_modal(
         [
             "run",
             f"{MODAL_APP}::smoke",
             "--prompt",
-            "solid red square on white background",
+            "dummy e2e json",
             "--seed",
             "42",
         ],
-        timeout=600,
+        timeout=300,
     )
     assert result.returncode == 0, f"smoke infer failed:\n{result.stderr}\n{result.stdout}"
-    assert "/tmp/klein-smoke.webp" in result.stdout
+    assert "/tmp/dummy-smoke.webp" in result.stdout
 
-    webp_path = Path("/tmp/klein-smoke.webp")
+    webp_path = Path("/tmp/dummy-smoke.webp")
     assert webp_path.is_file()
-    assert webp_path.stat().st_size > 100
+    assert webp_path.stat().st_size > 50
 
 
-def test_modal_infer_cond_images(deployed_app: None) -> None:
-    """Example 2: conditional images with list_apply translator."""
+def test_modal_infer_stream(deployed_app: None) -> None:
     result = _run_modal(
         [
             "run",
-            f"{MODAL_APP}::smoke_cond",
+            f"{MODAL_APP}::smoke_stream",
             "--prompt",
-            "recreate this exact solid red square",
+            "dummy e2e stream",
             "--seed",
-            "42",
+            "7",
         ],
-        timeout=600,
+        timeout=300,
     )
-    assert result.returncode == 0, f"smoke_cond failed:\n{result.stderr}\n{result.stdout}"
-    assert "/tmp/klein-smoke-cond.webp" in result.stdout
+    assert result.returncode == 0, f"smoke_stream failed:\n{result.stderr}\n{result.stdout}"
+    assert "progress events:" in result.stdout
+    assert "/tmp/dummy-smoke-stream.webp" in result.stdout
 
-    webp_path = Path("/tmp/klein-smoke-cond.webp")
+    webp_path = Path("/tmp/dummy-smoke-stream.webp")
     assert webp_path.is_file()
-    assert webp_path.stat().st_size > 100
+    assert webp_path.stat().st_size > 50

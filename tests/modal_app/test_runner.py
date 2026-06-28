@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import pytest
@@ -9,6 +11,8 @@ import torch
 
 from infusers.modal_app.base import DESCRIBE_PATH, GenericModelRunner, RouteDef, RunnerError
 from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
+from infusers.quant.api.base import IntermediateEvent
+from infusers.quant.api.image_base import ImageOutput
 
 
 @dataclass
@@ -29,11 +33,33 @@ class MockQuant:
         return EchoOutput(echo=kwargs.get("prompt", ""), image=tensor)
 
 
+class MockStreamQuant:
+    def __init__(self) -> None:
+        self.device = torch.device("cpu")
+        self.model = self
+        self.calls: list[dict] = []
+
+    def forward_gen(self, **kwargs) -> Iterator[IntermediateEvent | ImageOutput]:
+        self.calls.append(kwargs)
+        yield IntermediateEvent(message="mock step 1")
+        yield IntermediateEvent(message="mock step 2")
+        yield ImageOutput(message="mock done", image=torch.ones(3, 2, 2))
+
+    def __call__(self, **kwargs):
+        final = None
+        for item in self.forward_gen(**kwargs):
+            if isinstance(item, IntermediateEvent):
+                continue
+            final = item
+        return final
+
+
 ECHO_ROUTE = RouteDef(
     path="test/echo",
     recipe="quant/test/echo",
     output_key="image",
-    output_translators=[GetAttr("image"), TensorToWebpB64()],
+    final_translators=[GetAttr("image"), TensorToWebpB64()],
+    intermediate_translators=[GetAttr("message")],
     allowed_input_translators={
         "tags": ["list_apply[identity]"],
     },
@@ -58,7 +84,7 @@ def test_describe_returns_routes_and_translators(runner: EchoRunner) -> None:
     out = runner.run({"path": DESCRIBE_PATH})
     assert "result" in out
     assert ECHO_ROUTE.path in out["result"]["routes"]
-    assert "GetAttr('image')" in out["result"]["routes"][ECHO_ROUTE.path]["output_translators"]
+    assert "GetAttr('image')" in out["result"]["routes"][ECHO_ROUTE.path]["final_translators"]
     assert "imageb64_to_tensor" in out["result"]["available_translators"]
     assert out["metadata"]["path"] == DESCRIBE_PATH
 
@@ -123,5 +149,71 @@ def test_disallowed_translator_raises(runner: EchoRunner) -> None:
                 "inputs": {"prompt": "x", "tags": ["a"]},
                 "translator": {"tags": "identity"},
             }
+        )
+    assert exc.value.status_code == 400
+
+
+STREAM_ROUTE = RouteDef(
+    path="test/stream",
+    recipe="quant/test/stream",
+    output_key="image",
+    intermediate_translators=[GetAttr("message")],
+    final_translators=[GetAttr("image"), TensorToWebpB64()],
+    allowed_input_translators={},
+)
+
+
+class StreamRunner(GenericModelRunner):
+    ROUTES = [STREAM_ROUTE]
+
+
+@pytest.fixture
+def stream_runner() -> StreamRunner:
+    r = StreamRunner()
+    r.init_routes()
+    mock = MockStreamQuant()
+    r._quants[STREAM_ROUTE.recipe] = mock
+    r._mock = mock  # type: ignore[attr-defined]
+    return r
+
+
+def test_run_stream_emits_progress_and_result(stream_runner: StreamRunner) -> None:
+    body = {"path": STREAM_ROUTE.path, "inputs": {"prompt": "stream me"}}
+    frames = list(stream_runner.run_stream(body))
+    assert len(frames) >= 2
+
+    progress = []
+    result = None
+    for frame in frames:
+        payload = json.loads(frame.removeprefix("data: ").strip())
+        if payload["kind"] == "progress":
+            progress.append(payload["message"])
+        elif payload["kind"] == "result":
+            result = payload
+
+    assert progress == ["mock step 1", "mock step 2"]
+    assert result is not None
+    assert "image" in result["result"]
+    assert stream_runner._mock.calls == [{"prompt": "stream me"}]  # type: ignore[attr-defined]
+
+
+def test_run_stream_logs_progress_and_final(stream_runner: StreamRunner, capsys) -> None:
+    body = {"path": STREAM_ROUTE.path, "inputs": {"prompt": "stream me"}}
+    list(stream_runner.run_stream(body))
+    out = capsys.readouterr().out
+
+    assert '"event": "progress_event"' in out
+    assert '"message": "mock step 1"' in out
+    assert '"message": "mock step 2"' in out
+    assert '"event": "output_translators_applied"' in out
+    assert '"event": "inference_stream_end"' in out
+
+
+def test_run_stream_requires_forward_gen(runner: EchoRunner) -> None:
+    with pytest.raises(RunnerError, match="does not support streaming") as exc:
+        list(
+            runner.run_stream(
+                {"path": ECHO_ROUTE.path, "inputs": {"prompt": "x"}},
+            )
         )
     assert exc.value.status_code == 400

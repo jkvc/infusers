@@ -1,0 +1,4 @@
+# @package _global_
+_target_: infusers.quant.api.image_base.DummyImageQuant
+num_steps: 3
+resolution: [64, 64]

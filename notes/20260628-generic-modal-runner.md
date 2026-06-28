@@ -83,7 +83,8 @@ ROUTES = [
         path="klein9b.image",
         recipe="quant/flux/klein9b/image_basic",
         output_key="image",
-        output_translators=[GetAttr("image"), TensorToWebpB64()],
+        intermediate_translators=[GetAttr("message")],
+        final_translators=[GetAttr("image"), TensorToWebpB64()],
         allowed_input_translators={
             "cond_images": ["list_apply[imageb64_to_tensor]"],
         },
@@ -95,7 +96,8 @@ ROUTES = [
 | --- | --- | --- |
 | `path` | route | caller selects route |
 | `recipe` | route | reqm config name for `QM.build` |
-| `output_translators` | route | list of instantiated translator classes, applied in order |
+| `final_translators` | route | list of instantiated translator classes on the final quant artifact |
+| `intermediate_translators` | route | list applied to each progress event (typically `GetAttr("message")`) |
 | `allowed_input_translators` | route | field → list of permitted DSL strings |
 | `translator` (request) | caller | per-field DSL string; required when that field is in `inputs` |
 
@@ -118,20 +120,33 @@ POST { path, inputs, translator? }
   → require + apply caller input translators (allowed-set check)
   → QM.build(recipe) [cached per recipe in container]
   → quant(**kwargs)
-  → apply_chain(output_translators)
+  → apply_chain(final_translators)
   → { result, metadata }
+```
+
+Streaming (`POST` to stream endpoint, SSE) — generator quants, `forward_gen`, dual endpoints, logging, dummy recipe, cold-start numbers: [`20260628-generator-quant-streaming.md`](20260628-generator-quant-streaming.md).
+
+```
+POST { path, inputs, translator? }
+  → same input path as above
+  → quant.forward_gen(**kwargs) in a worker thread
+  → bounded queue (drop oldest progress when full; never drop final)
+  → apply_chain(intermediate_translators) → {"kind":"progress","message":...}
+  → apply_chain(final_translators) → {"kind":"result","result":...,"metadata":...}
 ```
 
 ## Tests
 
 | Suite | What |
 | --- | --- |
+| `tests/quant/test_generator.py` | generator base, dummy quant, reqm build |
+| `tests/modal_app/test_stream.py` | bounded queue, SSE framing |
 | `tests/modal_app/test_dsl.py` | DSL parse + compose |
 | `tests/modal_app/test_translators.py` | b64 ↔ tensor roundtrip |
-| `tests/modal_app/test_runner.py` | dispatch, describe, translator enforcement |
-| `tests/modal_app/test_modal_e2e.py` | deploy + describe + t2i + cond_images (`pytest -m modal`) |
+| `tests/modal_app/test_runner.py` | dispatch, describe, stream, translator enforcement |
+| `tests/modal_app/test_modal_e2e.py` | deploy dummy runner (`pytest -m modal`) — see streaming note for HTTP curl validation |
 
-Smoke entrypoints: `smoke`, `smoke_cond`, `smoke_describe`. HTTP smoke: `./scripts/smoke.sh` (needs `MODAL_WEB_URL`).
+Smoke entrypoints: Klein — `smoke`, `smoke_cond`, `smoke_describe`. Dummy — `smoke`, `smoke_stream`, `smoke_describe`. HTTP smoke: `./scripts/smoke.sh` (needs `MODAL_WEB_URL`).
 
 ## Breaking change from prior Modal API
 

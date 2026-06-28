@@ -1,9 +1,9 @@
-"""Klein 9B on Modal — generic runner with Volume-backed weights."""
+"""CPU-only Modal runner with dummy image quant — fast e2e without GPU weights."""
 
 from __future__ import annotations
 
 import base64
-import os
+import json
 import time
 from pathlib import Path
 from typing import Any
@@ -13,29 +13,18 @@ import modal
 from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
 from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
 
-APP_NAME = "lunas-courageous-adventure"
-VOLUME_NAME = "jkvc-klein-9b-weights"
-WEIGHTS_MOUNT = Path("/weights")
-HF_HOME = WEIGHTS_MOUNT / "klein-9b" / "hf"
-
-weights_vol = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
+APP_NAME = "infusers-dummy-image"
+DUMMY_PATH = "dummy.image"
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
-    .apt_install("git")
     .pip_install(
         "reqm>=0.1.1",
         "torch==2.8.0",
-        "torchvision",
-        "transformers==4.56.1",
-        "einops==0.8.1",
-        "safetensors==0.4.5",
+        "numpy>=2",
         "pillow>=10",
-        "sentencepiece>=0.2.0",
         "fastapi[standard]>=0.115",
-        extra_index_url="https://download.pytorch.org/whl/cu124",
     )
-    .pip_install("git+https://github.com/black-forest-labs/flux2.git")
     .add_local_python_source("infusers")
     .add_local_dir(
         Path(__file__).resolve().parent.parent / "configs",
@@ -46,42 +35,25 @@ image = (
 app = modal.App(APP_NAME, image=image)
 
 
-@app.cls(
-    gpu="L40S",
-    volumes={str(WEIGHTS_MOUNT): weights_vol},
-    scaledown_window=120,
-    timeout=600,
-)
-class LunasCourageousAdventure(GenericModelRunner):
+@app.cls(scaledown_window=60, timeout=120)
+class DummyImageRunner(GenericModelRunner):
     ROUTES = [
         RouteDef(
-            path="klein9b.image",
-            recipe="quant/flux/klein9b/image_basic",
+            path=DUMMY_PATH,
+            recipe="quant/image_basic_dummy",
             output_key="image",
             intermediate_translators=[GetAttr("message")],
             final_translators=[GetAttr("image"), TensorToWebpB64()],
-            allowed_input_translators={
-                "cond_images": ["list_apply[imageb64_to_tensor]"],
-            },
+            allowed_input_translators={},
         ),
     ]
 
     @modal.enter()
     def setup(self) -> None:
         t0 = time.perf_counter()
-        os.environ["HF_HOME"] = str(HF_HOME)
-        os.environ["HF_HUB_OFFLINE"] = "1"
-        os.environ["TRANSFORMERS_OFFLINE"] = "1"
-
-        ckpt = WEIGHTS_MOUNT / "klein-9b" / "klein-9b"
-        if not ckpt.is_dir():
-            raise FileNotFoundError(
-                f"Missing weights at {ckpt}. Run ./scripts/upload_weights.sh from your machine."
-            )
-
         self.init_routes()
         self.get_quant(self.ROUTES[0].recipe)
-        print(f"Runner ready ({self.ROUTES[0].path}) in {time.perf_counter() - t0:.1f}s")
+        print(f"Dummy runner ready ({DUMMY_PATH}) in {time.perf_counter() - t0:.1f}s")
 
     @modal.method()
     def run_remote(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -101,7 +73,7 @@ class LunasCourageousAdventure(GenericModelRunner):
         except RunnerError as exc:
             raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
-    @modal.fastapi_endpoint(method="POST", docs=True, label="klein-stream")
+    @modal.fastapi_endpoint(method="POST", docs=True, label="stream")
     def web_stream(self, item: dict[str, Any]):
         from fastapi import HTTPException
         from fastapi.responses import StreamingResponse
@@ -114,70 +86,66 @@ class LunasCourageousAdventure(GenericModelRunner):
 
 @app.local_entrypoint()
 def smoke(
-    prompt: str = "solid red square on white background",
+    prompt: str = "dummy smoke",
     seed: int = 42,
 ) -> None:
-    """CLI smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke"""
-    service = LunasCourageousAdventure()
+    """CLI smoke: uv run modal run infusers/modal_app/dummy_image.py::smoke"""
+    service = DummyImageRunner()
     t0 = time.perf_counter()
 
     body = {
-        "path": "klein9b.image",
-        "inputs": {"prompt": prompt, "seed": seed, "resolution": [512, 512]},
+        "path": DUMMY_PATH,
+        "inputs": {"prompt": prompt, "seed": seed},
     }
     response = service.run_remote.remote(body)
     elapsed = time.perf_counter() - t0
 
     image_b64 = response["result"]["image"]
-    out = Path("/tmp/klein-smoke.webp")
+    out = Path("/tmp/dummy-smoke.webp")
     out.write_bytes(base64.b64decode(image_b64))
-    meta = response.get("metadata", {})
     print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
-    print(f"metadata: {meta}")
+    print(f"metadata: {response.get('metadata', {})}")
 
 
 @app.local_entrypoint()
-def smoke_cond(
-    prompt: str = "recreate this exact solid red square",
-    seed: int = 42,
+def smoke_stream(
+    prompt: str = "dummy stream smoke",
+    seed: int = 7,
 ) -> None:
-    """CLI smoke with cond_images: uv run modal run ...::smoke_cond"""
-    import io
-
-    from PIL import Image
-
-    service = LunasCourageousAdventure()
+    """CLI stream smoke: uv run modal run infusers/modal_app/dummy_image.py::smoke_stream"""
+    service = DummyImageRunner()
     t0 = time.perf_counter()
 
-    buf = io.BytesIO()
-    Image.new("RGB", (64, 64), color=(255, 0, 0)).save(buf, format="PNG")
-    cond_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
-
     body = {
-        "path": "klein9b.image",
-        "inputs": {
-            "prompt": prompt,
-            "seed": seed,
-            "resolution": [512, 512],
-            "cond_images": [cond_b64],
-        },
-        "translator": {"cond_images": "list_apply[imageb64_to_tensor]"},
+        "path": DUMMY_PATH,
+        "inputs": {"prompt": prompt, "seed": seed},
     }
-    response = service.run_remote.remote(body)
+    chunks = service.run_stream_remote.remote(body)
     elapsed = time.perf_counter() - t0
 
-    image_b64 = response["result"]["image"]
-    out = Path("/tmp/klein-smoke-cond.webp")
+    progress: list[str] = []
+    result_payload: dict[str, Any] | None = None
+    for chunk in chunks:
+        line = chunk.removeprefix("data: ").strip()
+        payload = json.loads(line)
+        if payload["kind"] == "progress":
+            progress.append(payload["message"])
+        elif payload["kind"] == "result":
+            result_payload = payload
+
+    assert result_payload is not None, "stream did not emit a result event"
+    image_b64 = result_payload["result"]["image"]
+    out = Path("/tmp/dummy-smoke-stream.webp")
     out.write_bytes(base64.b64decode(image_b64))
-    meta = response.get("metadata", {})
+    print(f"progress events: {progress}")
     print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
-    print(f"metadata: {meta}")
+    print(f"metadata: {result_payload.get('metadata', {})}")
 
 
 @app.local_entrypoint()
 def smoke_describe() -> None:
-    """Describe smoke: uv run modal run ...::smoke_describe"""
-    service = LunasCourageousAdventure()
+    """Describe smoke: uv run modal run infusers/modal_app/dummy_image.py::smoke_describe"""
+    service = DummyImageRunner()
     response = service.run_remote.remote({"path": "__DESCRIBE__"})
     routes = response["result"]["routes"]
     print(f"routes: {list(routes.keys())}")
