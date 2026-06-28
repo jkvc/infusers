@@ -1,0 +1,3 @@
+# @package _global_
+_target_: infusers.model.klein.KleinModel
+model_name: flux.2-klein-9b

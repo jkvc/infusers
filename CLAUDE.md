@@ -43,17 +43,21 @@ See [`docs/modal.md`](docs/modal.md) for staging weights, Volume upload, and smo
 ```
 infusers/
 ├── infusers/
-│   ├── model/         # Model implementations (klein, …)
-│   └── modal_app/     # Modal deploy modules (one file per deployed app)
+│   ├── configs/       # reqm YAML (models + quants)
+│   ├── model/         # Model implementations (KleinModel, …)
+│   ├── quant/         # Inferencers (FluxImageQuant, …)
+│   ├── scripts/       # inference_image.py CLI
+│   └── modal_app/     # Modal deploy modules
 ├── docs/              # Operational guides (e.g. modal.md)
 ├── scripts/           # Weight staging, upload, smoke tests
 ├── tests/             # pytest
 └── notes/             # Design notes (yyyymmdd-slug.md)
 ```
 
-- **Heavy imports** (`torch`, `diffusers`, etc.) belong inside `@modal.enter()` or endpoint methods in Modal apps, not at module level in deploy modules that only need the Modal CLI locally.
+- **reqm chokepoint:** `from infusers import QM` then `QM.build("<recipe>")` — all call sites (Modal, CLI, tests).
+- **Heavy imports** (`torch`, etc.) belong inside quant/model code and `@modal.enter()`, not at module level in deploy modules where avoidable.
 - **Pin dependency versions** in Modal image `pip_install` lists for reproducible remote builds.
-- **Share code** between deploy modules via `infusers.model` (`add_local_python_source("infusers")`) — not ad-hoc copies.
+- **YAML configs** must start with `# @package _global_`; run `QM.validate()` in tests/CI.
 
 ### 7. Model Loading Convention
 

@@ -8,6 +8,7 @@ dependencies = [
     "flux",
     "click>=8",
     "pillow>=10",
+    "reqm>=0.1.0",
 ]
 
 [dependency-groups]
@@ -34,6 +35,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["infusers"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"infusers/configs" = "infusers/configs"
 
 [tool.black]
 line-length = 100

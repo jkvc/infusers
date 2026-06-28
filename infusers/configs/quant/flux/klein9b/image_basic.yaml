@@ -1,0 +1,9 @@
+# @package _global_
+defaults:
+  - /models/flux/klein9b@model
+  - _self_
+
+_target_: infusers.quant.flux.image.FluxImageQuant
+num_steps: 4
+guidance: 1.0
+cpu_offload: false

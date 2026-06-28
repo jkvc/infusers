@@ -47,40 +47,67 @@ curl -X POST "$MODAL_WEB_URL" \
   -o out.jpg
 ```
 
+Optional conditional images (base64-encoded JPEG/PNG list):
+
+```bash
+curl -X POST "$MODAL_WEB_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"match this style","seed":42,"width":512,"height":512,"cond_images_base64":["<base64>"]}' \
+  -o out.jpg
+```
+
+## Local inference (same recipe)
+
+```bash
+uv run python -m infusers.scripts.inference_image \
+  --recipe quant/flux/klein9b/image_basic \
+  -p "solid red square on white background" \
+  -o .model-out/smoke \
+  --width 512 --height 512 --seed 42
+```
+
+CPU-offload test recipe: `quant/flux/klein9b/image_basic_offload`.
+
 ## Day-to-day workflow
 
 | Task | Command |
 | --- | --- |
-| Change inference code | Edit `infusers/model/` or the modal app module, then redeploy |
+| Change inference logic | Edit `infusers/quant/` or model YAML, redeploy |
+| Change hyperparams | Edit `infusers/configs/quant/...` YAML |
 | Change weights | Re-run `stage_weights.sh` + `upload_weights.sh` (rare) |
+| Validate configs | `uv run python -c "from infusers import QM; QM.validate()"` |
 | View logs | `uv run modal app logs lunas-courageous-adventure` |
 | Dashboard | https://modal.com/apps — select `lunas-courageous-adventure` |
 
-Code-only deploys are fast (small image). Weights are **not** in the Docker image; they mount from the Volume at container start.
+Code-only deploys are fast (small image). Weights mount from Volume at container start.
 
 ## Key files
 
 | Path | Role |
 | --- | --- |
-| `infusers/modal_app/lunas_courageous_adventure.py` | Modal app: image, Volume mount, web endpoint (Klein 9B today) |
-| `infusers/model/klein.py` | Klein model load + generate (flux2) |
-| `scripts/stage_weights.sh` | Copy Klein safetensors + HF Qwen cache locally |
-| `scripts/upload_weights.sh` | `modal volume put` to `jkvc-klein-9b-weights` |
-| `scripts/smoke.sh` | POST cold + warm timing test |
+| `infusers/modal_app/lunas_courageous_adventure.py` | Modal app — `QM.build("quant/flux/klein9b/image_basic")`; mounts `configs/` for reqm YAML |
+| `infusers/model/klein.py` | `KleinModel` — flow, AE, text encoder only |
+| `infusers/quant/flux/image.py` | `FluxImageQuant` — steps, guidance, denoise loop |
+| `infusers/configs/` | reqm YAML recipes |
+| `infusers/__init__.py` | `QM = QuantManager(configs)` chokepoint |
+| `scripts/stage_weights.sh` | Stage weights locally |
+| `scripts/upload_weights.sh` | Upload to Modal Volume |
+| `scripts/smoke.sh` | HTTP timing smoke test |
 
 ## Runtime behavior
 
 - **GPU:** L40S
-- **Cold boot:** ~60–72s (load from Volume + warmup infer in `@modal.enter`)
+- **Setup:** loads `KleinModel` via reqm (~60s) — no warmup infer in setup
+- **Cold first request:** setup + first infer (~70s total wall on HTTP)
 - **Warm:** ~1s per request while container is up
-- **`scaledown_window`:** 120s — GPU stays allocated (and billed) up to 2 minutes after the last request
-
-Tuning `scaledown_window` in the modal app module trades idle cost vs likelihood of warm hits. See experiment note for cost math.
+- **`scaledown_window`:** 120s idle billing window
 
 ## Troubleshooting
 
 **`command not found: modal`** — use `uv run modal`, not bare `modal`.
 
-**`Missing klein weights at /weights/...`** — Volume empty or wrong layout; run `upload_weights.sh` and verify with `uv run modal volume ls jkvc-klein-9b-weights /klein-9b`.
+**`Missing klein weights`** — run `upload_weights.sh` (Modal) or `stage_weights.sh` (local).
 
-**Setup fails on HF download** — staging should have populated `weights/klein-9b/hf/`; re-run `stage_weights.sh` with valid HF auth.
+**Config errors** — run `QM.validate()`; every YAML needs `# @package _global_` header.
+
+**`Available configs: []` on Modal** — reqm YAML is not shipped by `add_local_python_source` alone; the app image must also mount `infusers/configs/` (see `add_local_dir` in `lunas_courageous_adventure.py`).

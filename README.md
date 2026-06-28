@@ -9,9 +9,12 @@ One weight load, many parametrized modes (plain t2i, MultiDiffusion, panorama, t
 ```
 infusers/
 ├── infusers/
-│   ├── model/       # Model implementations (klein, …)
-│   └── modal_app/   # Modal deploy modules (one file per deployed app)
-├── docs/            # Operational guides (e.g. modal.md)
+│   ├── configs/     # reqm YAML recipes (models + quants)
+│   ├── model/       # Model implementations (KleinModel, …)
+│   ├── quant/       # Inferencers (FluxImageQuant, …)
+│   ├── scripts/     # inference_image.py CLI
+│   └── modal_app/   # Modal deploy modules
+├── docs/
 ├── scripts/         # Weight staging, upload, smoke tests
 ├── tests/
 └── notes/
@@ -65,13 +68,16 @@ uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 | `uv run ruff check .` | Lint |
 | `uv run black .` | Format |
 | `uv run pytest` | Unit tests |
+| `uv run python -m infusers.scripts.inference_image --recipe quant/flux/klein9b/image_basic -p "…" -o out/` | Local GPU inference via reqm |
 
 ## Adding a Modal app
 
-1. Create `infusers/modal_app/<name>.py` with a `modal.App` and `@app.cls` / endpoints.
-2. Import model code from `infusers.model.*` (`add_local_python_source("infusers")` in the image).
+1. Create `infusers/modal_app/<name>.py` — thin wrapper around `QM.build(recipe)`.
+2. Add quant/model YAML under `infusers/configs/`.
 3. Test: `uv run modal run infusers/modal_app/<name>.py::<entrypoint>`
 4. Deploy: `uv run modal deploy infusers/modal_app/<name>.py`
+
+All call sites use `from infusers import QM` — one chokepoint, recipe name is the only variable.
 
 ## Environment
 

@@ -30,14 +30,14 @@ POST web endpoint → JPEG
 | `/weights/klein-9b/klein-9b/` | `flux-2-klein-9b.safetensors`, `ae.safetensors` |
 | `/weights/klein-9b/hf/` | HF hub cache for `Qwen/Qwen3-8B-FP8` |
 
-Loader: `infusers.model.klein.load` with `HF_HUB_OFFLINE=1`.
+Loader: `QM.build("quant/flux/klein9b/image_basic")` in setup with `HF_HUB_OFFLINE=1`. Modal image mounts `infusers/configs/` explicitly (see [`docs/modal.md`](../docs/modal.md)).
 
 ## Deployed endpoints
 
 - **Web API:** `https://kevinehc--lunas-courageous-adventure-lunascourageousadve-93e216.modal.run`
 - **Swagger:** same URL + `/docs`
 
-POST JSON: `{"prompt": "...", "seed": 42, "width": 512, "height": 512}` → JPEG bytes.
+POST JSON: `{"prompt": "...", "seed": 42, "width": 512, "height": 512}` → JPEG bytes. Optional `cond_images_base64`: list of base64-encoded JPEG/PNG strings.
 
 ## Runtime settings
 
@@ -49,8 +49,8 @@ POST JSON: `{"prompt": "...", "seed": 42, "width": 512, "height": 512}` → JPEG
 
 ## Measured performance (2026-06-28)
 
-- Setup log: `Klein 9B ready in ~60s`
-- Cold wall (HTTP): ~72s
+- **Setup log:** `Quant ready` (~60s model load)
+- **Cold wall (HTTP):** ~70s (setup + first infer; no warmup in setup)
 - Warm wall: ~1.2s; execution ~0.8s in Modal logs
 - Warm probes at +2/4/6/8 min idle: still ~1.2s (under prior 10 min window)
 
