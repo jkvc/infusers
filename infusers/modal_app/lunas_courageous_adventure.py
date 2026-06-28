@@ -1,21 +1,22 @@
-"""Klein 9B on Modal — Volume-backed weights, reqm quant chokepoint."""
+"""Klein 9B on Modal — generic runner with Volume-backed weights."""
 
 from __future__ import annotations
 
 import base64
-import io
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import modal
-import torch
+
+from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
+from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
 
 APP_NAME = "lunas-courageous-adventure"
 VOLUME_NAME = "jkvc-klein-9b-weights"
 WEIGHTS_MOUNT = Path("/weights")
 HF_HOME = WEIGHTS_MOUNT / "klein-9b" / "hf"
-DEFAULT_RECIPE = "quant/flux/klein9b/image_basic"
 
 weights_vol = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
 
@@ -36,7 +37,6 @@ image = (
     )
     .pip_install("git+https://github.com/black-forest-labs/flux2.git")
     .add_local_python_source("infusers")
-    # add_local_python_source ships .py only; reqm YAML lives in infusers/configs/
     .add_local_dir(
         Path(__file__).resolve().parent.parent / "configs",
         remote_path="/root/infusers/configs",
@@ -46,35 +46,27 @@ image = (
 app = modal.App(APP_NAME, image=image)
 
 
-def _decode_cond_images_base64(
-    encoded: list[str] | None,
-    device: torch.device,
-) -> list[torch.Tensor] | None:
-    if not encoded:
-        return None
-    from PIL import Image
-
-    from infusers.quant.api.image_base import pil_to_chw_float01
-
-    tensors: list[torch.Tensor] = []
-    for item in encoded:
-        raw = base64.b64decode(item)
-        pil = Image.open(io.BytesIO(raw)).convert("RGB")
-        tensors.append(pil_to_chw_float01(pil, device))
-    return tensors
-
-
 @app.cls(
     gpu="L40S",
     volumes={str(WEIGHTS_MOUNT): weights_vol},
     scaledown_window=120,
     timeout=600,
 )
-class LunasCourageousAdventure:
+class LunasCourageousAdventure(GenericModelRunner):
+    ROUTES = [
+        RouteDef(
+            path="klein9b.image",
+            recipe="quant/flux/klein9b/image_basic",
+            output_key="image",
+            output_translators=[GetAttr("image"), TensorToWebpB64()],
+            allowed_input_translators={
+                "cond_images": ["list_apply[imageb64_to_tensor]"],
+            },
+        ),
+    ]
+
     @modal.enter()
     def setup(self) -> None:
-        from infusers import QM
-
         t0 = time.perf_counter()
         os.environ["HF_HOME"] = str(HF_HOME)
         os.environ["HF_HUB_OFFLINE"] = "1"
@@ -86,64 +78,92 @@ class LunasCourageousAdventure:
                 f"Missing weights at {ckpt}. Run ./scripts/upload_weights.sh from your machine."
             )
 
-        self.quant = QM.build(DEFAULT_RECIPE)
-        print(f"Quant ready ({DEFAULT_RECIPE}) in {time.perf_counter() - t0:.1f}s")
+        self.init_routes()
+        self.get_quant(self.ROUTES[0].recipe)
+        print(f"Runner ready ({self.ROUTES[0].path}) in {time.perf_counter() - t0:.1f}s")
 
     @modal.method()
-    def infer(
-        self,
-        prompt: str,
-        seed: int | None = None,
-        resolution: list[int] | None = None,
-        cond_images_base64: list[str] | None = None,
-    ) -> bytes:
-        from infusers.quant.api.image_base import chw_float01_to_pil
-
-        device = self.quant.model.device
-        kwargs: dict[str, object] = {"prompt": prompt}
-        if seed is not None:
-            kwargs["seed"] = seed
-        if resolution is not None:
-            kwargs["resolution"] = resolution
-        cond = _decode_cond_images_base64(cond_images_base64, device)
-        if cond is not None:
-            kwargs["cond_images"] = cond
-        out = self.quant(**kwargs)
-        pil = chw_float01_to_pil(out.image)
-        buf = io.BytesIO()
-        pil.save(buf, format="JPEG", quality=95)
-        return buf.getvalue()
+    def run_remote(self, body: dict[str, Any]) -> dict[str, Any]:
+        return self.run(body)
 
     @modal.fastapi_endpoint(method="POST", docs=True)
-    def web(self, item: dict):
+    def web(self, item: dict[str, Any]):
         from fastapi import HTTPException
-        from fastapi.responses import Response
+        from fastapi.responses import JSONResponse
 
-        if "prompt" not in item:
-            raise HTTPException(status_code=400, detail="prompt is required")
-
-        infer_kwargs: dict[str, object] = {"prompt": str(item["prompt"])}
-        if "seed" in item and item["seed"] is not None:
-            infer_kwargs["seed"] = int(item["seed"])
-        if "resolution" in item and item["resolution"] is not None:
-            resolution = list(item["resolution"])
-            if len(resolution) != 2:
-                raise HTTPException(status_code=400, detail="resolution must be [height, width]")
-            infer_kwargs["resolution"] = [int(resolution[0]), int(resolution[1])]
-        if "cond_images_base64" in item and item["cond_images_base64"] is not None:
-            infer_kwargs["cond_images_base64"] = list(item["cond_images_base64"])
-
-        jpeg = self.infer.local(**infer_kwargs)
-        return Response(content=jpeg, media_type="image/jpeg")
+        try:
+            return JSONResponse(self.run(item))
+        except RunnerError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
 
 @app.local_entrypoint()
-def smoke(prompt: str = "solid red square on white background", seed: int = 42) -> None:
+def smoke(
+    prompt: str = "solid red square on white background",
+    seed: int = 42,
+) -> None:
     """CLI smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke"""
     service = LunasCourageousAdventure()
     t0 = time.perf_counter()
-    jpeg = service.infer.remote(prompt, seed=seed, resolution=[512, 512])
+
+    body = {
+        "path": "klein9b.image",
+        "inputs": {"prompt": prompt, "seed": seed, "resolution": [512, 512]},
+    }
+    response = service.run_remote.remote(body)
     elapsed = time.perf_counter() - t0
-    out = Path("/tmp/klein-smoke.jpg")
-    out.write_bytes(jpeg)
-    print(f"done in {elapsed:.1f}s -> {out} ({len(jpeg)} bytes)")
+
+    image_b64 = response["result"]["image"]
+    out = Path("/tmp/klein-smoke.webp")
+    out.write_bytes(base64.b64decode(image_b64))
+    meta = response.get("metadata", {})
+    print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
+    print(f"metadata: {meta}")
+
+
+@app.local_entrypoint()
+def smoke_cond(
+    prompt: str = "recreate this exact solid red square",
+    seed: int = 42,
+) -> None:
+    """CLI smoke with cond_images: uv run modal run ...::smoke_cond"""
+    import io
+
+    from PIL import Image
+
+    service = LunasCourageousAdventure()
+    t0 = time.perf_counter()
+
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 64), color=(255, 0, 0)).save(buf, format="PNG")
+    cond_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    body = {
+        "path": "klein9b.image",
+        "inputs": {
+            "prompt": prompt,
+            "seed": seed,
+            "resolution": [512, 512],
+            "cond_images": [cond_b64],
+        },
+        "translator": {"cond_images": "list_apply[imageb64_to_tensor]"},
+    }
+    response = service.run_remote.remote(body)
+    elapsed = time.perf_counter() - t0
+
+    image_b64 = response["result"]["image"]
+    out = Path("/tmp/klein-smoke-cond.webp")
+    out.write_bytes(base64.b64decode(image_b64))
+    meta = response.get("metadata", {})
+    print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
+    print(f"metadata: {meta}")
+
+
+@app.local_entrypoint()
+def smoke_describe() -> None:
+    """Describe smoke: uv run modal run ...::smoke_describe"""
+    service = LunasCourageousAdventure()
+    response = service.run_remote.remote({"path": "__DESCRIBE__"})
+    routes = response["result"]["routes"]
+    print(f"routes: {list(routes.keys())}")
+    print(f"translators: {response['result']['available_translators']}")

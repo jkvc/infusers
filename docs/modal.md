@@ -38,22 +38,48 @@ export MODAL_WEB_URL=https://<your-workspace>--lunas-courageous-adventure-<label
 ./scripts/smoke.sh
 ```
 
-Example request:
+Example infer request:
 
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"a cat","seed":42,"resolution":[512,512]}' \
-  -o out.jpg
+  -d '{
+    "path": "klein9b.image",
+    "inputs": {
+      "prompt": "a cat",
+      "seed": 42,
+      "resolution": [512, 512]
+    }
+  }' | jq .
 ```
 
-Optional conditional images (base64-encoded JPEG/PNG list):
+Response shape: `{ "result": { "image": "<webp base64>" }, "metadata": { ... } }`. Decode `result.image` to save a WebP file.
+
+Optional conditional images — caller must supply the input translator:
 
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"match this style","seed":42,"resolution":[512,512],"cond_images_base64":["<base64>"]}' \
-  -o out.jpg
+  -d '{
+    "path": "klein9b.image",
+    "inputs": {
+      "prompt": "match this style",
+      "seed": 42,
+      "resolution": [512, 512],
+      "cond_images": ["<base64>"]
+    },
+    "translator": {
+      "cond_images": "list_apply[imageb64_to_tensor]"
+    }
+  }' | jq .
+```
+
+Introspection (`__DESCRIBE__`):
+
+```bash
+curl -X POST "$MODAL_WEB_URL" \
+  -H "Content-Type: application/json" \
+  -d '{"path": "__DESCRIBE__"}' | jq .
 ```
 
 ## Local inference (same recipe)
@@ -85,7 +111,9 @@ Code-only deploys are fast (small image). Weights mount from Volume at container
 
 | Path | Role |
 | --- | --- |
-| `infusers/modal_app/lunas_courageous_adventure.py` | Modal app — `QM.build("quant/flux/klein9b/image_basic")`; mounts `configs/` for reqm YAML |
+| `infusers/modal_app/lunas_courageous_adventure.py` | Modal app — route defs + generic runner subclass |
+| `infusers/modal_app/base.py` | `GenericModelRunner` — route dispatch, describe |
+| `infusers/modal_app/translators/` | Translator classes + input DSL registry |
 | `infusers/model/klein.py` | `KleinModel` — flow, AE, text encoder only |
 | `infusers/quant/flux/image.py` | `FluxImageQuant` — steps, guidance, denoise loop |
 | `infusers/configs/` | reqm YAML recipes |

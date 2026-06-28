@@ -20,8 +20,10 @@ Modal Volume: jkvc-klein-9b-weights  →  mounted at /weights
 L40S container @modal.enter setup()
         │
         ▼
-POST web endpoint → JPEG
+POST web endpoint → JSON { result, metadata } (webp base64 in result.image)
 ```
+
+Wire format and route design: [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md).
 
 **Weight layout on Volume** (path inside container):
 
@@ -37,7 +39,7 @@ Loader: `QM.build("quant/flux/klein9b/image_basic")` in setup with `HF_HUB_OFFLI
 - **Web API:** `https://kevinehc--lunas-courageous-adventure-lunascourageousadve-93e216.modal.run`
 - **Swagger:** same URL + `/docs`
 
-POST JSON: `{"prompt": "...", "seed": 42, "resolution": [512, 512]}` → JPEG bytes (`prompt` required; other fields optional — quant defaults apply). Optional `cond_images_base64`: list of base64-encoded JPEG/PNG strings.
+POST JSON — see [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md) for request/response shape. Path: `klein9b.image`.
 
 ## Runtime settings
 
