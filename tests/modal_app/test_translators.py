@@ -9,7 +9,8 @@ import pytest
 import torch
 from PIL import Image
 
-from infusers.modal_app.translators import TranslatorContext, apply
+from infusers.modal_app.translators.context import TranslatorContext
+from infusers.modal_app.translators.dsl import apply
 
 
 def _solid_red_png_b64() -> str:

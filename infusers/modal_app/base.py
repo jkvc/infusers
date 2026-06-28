@@ -6,8 +6,17 @@ import time
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from infusers.modal_app.translators import TranslatorContext, apply, registered_names
-from infusers.modal_app.translators.registry import TranslatorFn, apply_chain
+import infusers.modal_app.translators.atomic as _translators_atomic  # noqa: F401 — registration
+import infusers.modal_app.translators.combinators as _translators_combinators  # noqa: F401
+from infusers.modal_app.log_util import (
+    log_event,
+    summarize_kwargs,
+    summarize_output_value,
+    summarize_request,
+)
+from infusers.modal_app.translators.context import TranslatorContext
+from infusers.modal_app.translators.dsl import apply
+from infusers.modal_app.translators.registry import TranslatorFn, apply_chain, registered_names
 
 DESCRIBE_PATH = "__DESCRIBE__"
 
@@ -57,7 +66,10 @@ class GenericModelRunner:
             raise RunnerError("path is required", status_code=400)
 
         if path == DESCRIBE_PATH:
-            return self._describe()
+            log_event("describe_begin")
+            response = self._describe()
+            log_event("describe_end", routes=list(response["result"]["routes"].keys()))
+            return response
 
         route = self._route_index.get(path)
         if route is None:
@@ -71,25 +83,51 @@ class GenericModelRunner:
         if translator_map is not None and not isinstance(translator_map, dict):
             raise RunnerError("translator must be an object when provided", status_code=400)
 
+        wall_t0 = time.perf_counter()
+        log_event("inference_begin", request=summarize_request(body), recipe=route.recipe)
+
         kwargs = dict(raw_inputs)
         self._require_input_translators(route, kwargs, translator_map)
         self._apply_input_translators(route, kwargs, translator_map)
+        log_event("input_translators_applied", quant_kwargs=summarize_kwargs(kwargs))
 
-        t0 = time.perf_counter()
         quant = self.get_quant(route.recipe)
         device = getattr(getattr(quant, "model", None), "device", None)
         ctx = TranslatorContext(device=device)
 
+        quant_t0 = time.perf_counter()
+        log_event("quant_begin", recipe=route.recipe, device=str(device) if device else None)
         out = quant(**kwargs)
+        quant_ms = int((time.perf_counter() - quant_t0) * 1000)
+        log_event("quant_end", elapsed_ms=quant_ms)
+
+        translate_t0 = time.perf_counter()
         translated = apply_chain(route.output_translators, out, ctx)
-        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        translate_ms = int((time.perf_counter() - translate_t0) * 1000)
+        log_event(
+            "output_translators_applied",
+            elapsed_ms=translate_ms,
+            output=summarize_output_value(route.output_key, translated),
+        )
+
+        total_ms = int((time.perf_counter() - wall_t0) * 1000)
+        log_event(
+            "inference_end",
+            path=route.path,
+            recipe=route.recipe,
+            elapsed_ms=total_ms,
+            quant_ms=quant_ms,
+            output_translate_ms=translate_ms,
+        )
 
         return {
             "result": {route.output_key: translated},
             "metadata": {
                 "path": route.path,
                 "recipe": route.recipe,
-                "elapsed_ms": elapsed_ms,
+                "elapsed_ms": total_ms,
+                "quant_ms": quant_ms,
+                "output_translate_ms": translate_ms,
                 "device": str(device) if device is not None else None,
             },
         }

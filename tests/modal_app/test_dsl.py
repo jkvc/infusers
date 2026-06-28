@@ -5,7 +5,8 @@ from __future__ import annotations
 import pytest
 import torch
 
-from infusers.modal_app.translators import TranslatorContext, parse
+from infusers.modal_app.translators.context import TranslatorContext
+from infusers.modal_app.translators.dsl import parse
 from infusers.modal_app.translators.registry import registered_names
 
 
