@@ -50,7 +50,7 @@ app = modal.App(APP_NAME, image=image)
 @app.cls(
     gpu="L40S",
     volumes={str(WEIGHTS_MOUNT): weights_vol},
-    scaledown_window=120,
+    scaledown_window=300,
     timeout=600,
 )
 class LunasCourageousAdventure(GenericModelRunner):
