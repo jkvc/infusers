@@ -9,7 +9,7 @@ import torch
 from PIL import Image
 from reqm.overrides_ext import override
 
-from infusers.quant.base import TorchQuant
+from infusers.quant.api.base import TorchQuant
 
 
 @dataclass

@@ -33,9 +33,15 @@ def _output_name(index: int, prompt: str) -> str:
     required=True,
     type=click.Path(path_type=Path, file_okay=False),
 )
-@click.option("--seed", default=None, type=int, help="Random seed; default random per run")
-@click.option("--width", default=1024, show_default=True)
-@click.option("--height", default=1024, show_default=True)
+@click.option("--seed", default=None, type=int, help="Random seed (quant default if omitted)")
+@click.option(
+    "--resolution",
+    nargs=2,
+    type=int,
+    default=None,
+    metavar="HEIGHT WIDTH",
+    help="Output size [height width] (quant default if omitted)",
+)
 @click.option(
     "--cond",
     "cond_paths",
@@ -48,8 +54,7 @@ def main(
     prompts: tuple[str, ...],
     output_dir: Path,
     seed: int | None,
-    width: int,
-    height: int,
+    resolution: tuple[int, int] | None,
     cond_paths: tuple[Path, ...],
 ) -> None:
     if not torch.cuda.is_available():
@@ -65,7 +70,7 @@ def main(
     click.echo(f"load: {load_s:.2f}s")
 
     device = quant.model.device
-    cond_tensors = None
+    cond_tensors: list[torch.Tensor] | None = None
     if cond_paths:
         cond_tensors = [
             pil_to_chw_float01(Image.open(path).convert("RGB"), device) for path in cond_paths
@@ -73,12 +78,14 @@ def main(
 
     for index, prompt in enumerate(prompts):
         infer_start = time.perf_counter()
-        out = quant(
-            prompt=prompt,
-            seed=seed,
-            resolution=[height, width],
-            cond_images=cond_tensors,
-        )
+        kwargs: dict[str, object] = {"prompt": prompt}
+        if seed is not None:
+            kwargs["seed"] = seed
+        if resolution is not None:
+            kwargs["resolution"] = list(resolution)
+        if cond_tensors is not None:
+            kwargs["cond_images"] = cond_tensors
+        out = quant(**kwargs)
         pil = chw_float01_to_pil(out.image)
         out_name = _output_name(index, prompt)
         out_path = output_dir / out_name

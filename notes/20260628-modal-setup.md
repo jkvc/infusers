@@ -37,7 +37,7 @@ Loader: `QM.build("quant/flux/klein9b/image_basic")` in setup with `HF_HUB_OFFLI
 - **Web API:** `https://kevinehc--lunas-courageous-adventure-lunascourageousadve-93e216.modal.run`
 - **Swagger:** same URL + `/docs`
 
-POST JSON: `{"prompt": "...", "seed": 42, "width": 512, "height": 512}` → JPEG bytes. Optional `cond_images_base64`: list of base64-encoded JPEG/PNG strings.
+POST JSON: `{"prompt": "...", "seed": 42, "resolution": [512, 512]}` → JPEG bytes (`prompt` required; other fields optional — quant defaults apply). Optional `cond_images_base64`: list of base64-encoded JPEG/PNG strings.
 
 ## Runtime settings
 

@@ -7,7 +7,7 @@ set -euo pipefail
 
 URL="${MODAL_WEB_URL:?Set MODAL_WEB_URL to your @modal.fastapi_endpoint URL}"
 
-payload='{"prompt":"solid red square on white background","seed":42,"width":512,"height":512}'
+payload='{"prompt":"solid red square on white background","seed":42,"resolution":[512,512]}'
 
 echo "=== cold-ish request ==="
 START=$(date +%s.%N)

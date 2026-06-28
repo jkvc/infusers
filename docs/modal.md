@@ -43,7 +43,7 @@ Example request:
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"a cat","seed":42,"width":512,"height":512}' \
+  -d '{"prompt":"a cat","seed":42,"resolution":[512,512]}' \
   -o out.jpg
 ```
 
@@ -52,7 +52,7 @@ Optional conditional images (base64-encoded JPEG/PNG list):
 ```bash
 curl -X POST "$MODAL_WEB_URL" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"match this style","seed":42,"width":512,"height":512,"cond_images_base64":["<base64>"]}' \
+  -d '{"prompt":"match this style","seed":42,"resolution":[512,512],"cond_images_base64":["<base64>"]}' \
   -o out.jpg
 ```
 
@@ -63,7 +63,7 @@ uv run python -m infusers.scripts.inference_image \
   --recipe quant/flux/klein9b/image_basic \
   -p "solid red square on white background" \
   -o .model-out/smoke \
-  --width 512 --height 512 --seed 42
+  --resolution 512 512 --seed 42
 ```
 
 CPU-offload test recipe: `quant/flux/klein9b/image_basic_offload`.

@@ -94,21 +94,21 @@ class LunasCourageousAdventure:
         self,
         prompt: str,
         seed: int | None = None,
-        width: int | None = None,
-        height: int | None = None,
+        resolution: list[int] | None = None,
         cond_images_base64: list[str] | None = None,
     ) -> bytes:
         from infusers.quant.api.image_base import chw_float01_to_pil
 
         device = self.quant.model.device
+        kwargs: dict[str, object] = {"prompt": prompt}
+        if seed is not None:
+            kwargs["seed"] = seed
+        if resolution is not None:
+            kwargs["resolution"] = resolution
         cond = _decode_cond_images_base64(cond_images_base64, device)
-        resolution = [height, width] if height is not None and width is not None else None
-        out = self.quant(
-            prompt=prompt,
-            seed=seed,
-            resolution=resolution,
-            cond_images=cond,
-        )
+        if cond is not None:
+            kwargs["cond_images"] = cond
+        out = self.quant(**kwargs)
         pil = chw_float01_to_pil(out.image)
         buf = io.BytesIO()
         pil.save(buf, format="JPEG", quality=95)
@@ -116,24 +116,24 @@ class LunasCourageousAdventure:
 
     @modal.fastapi_endpoint(method="POST", docs=True)
     def web(self, item: dict):
+        from fastapi import HTTPException
         from fastapi.responses import Response
 
-        prompt = str(item.get("prompt", "A cat holding a sign that says hello world"))
-        seed_raw = item.get("seed")
-        seed = int(seed_raw) if seed_raw is not None else None
-        width_raw = item.get("width")
-        height_raw = item.get("height")
-        width = int(width_raw) if width_raw is not None else None
-        height = int(height_raw) if height_raw is not None else None
-        cond_b64 = item.get("cond_images_base64")
-        cond_list = list(cond_b64) if cond_b64 else None
-        jpeg = self.infer.local(
-            prompt,
-            seed=seed,
-            width=width,
-            height=height,
-            cond_images_base64=cond_list,
-        )
+        if "prompt" not in item:
+            raise HTTPException(status_code=400, detail="prompt is required")
+
+        infer_kwargs: dict[str, object] = {"prompt": str(item["prompt"])}
+        if "seed" in item and item["seed"] is not None:
+            infer_kwargs["seed"] = int(item["seed"])
+        if "resolution" in item and item["resolution"] is not None:
+            resolution = list(item["resolution"])
+            if len(resolution) != 2:
+                raise HTTPException(status_code=400, detail="resolution must be [height, width]")
+            infer_kwargs["resolution"] = [int(resolution[0]), int(resolution[1])]
+        if "cond_images_base64" in item and item["cond_images_base64"] is not None:
+            infer_kwargs["cond_images_base64"] = list(item["cond_images_base64"])
+
+        jpeg = self.infer.local(**infer_kwargs)
         return Response(content=jpeg, media_type="image/jpeg")
 
 
@@ -142,7 +142,7 @@ def smoke(prompt: str = "solid red square on white background", seed: int = 42) 
     """CLI smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke"""
     service = LunasCourageousAdventure()
     t0 = time.perf_counter()
-    jpeg = service.infer.remote(prompt, seed=seed, width=512, height=512)
+    jpeg = service.infer.remote(prompt, seed=seed, resolution=[512, 512])
     elapsed = time.perf_counter() - t0
     out = Path("/tmp/klein-smoke.jpg")
     out.write_bytes(jpeg)

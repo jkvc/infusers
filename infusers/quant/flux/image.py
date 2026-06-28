@@ -27,12 +27,14 @@ class FluxImageQuant(ImageQuant):
         model: KleinModel,
         num_steps: int,
         guidance: float,
+        resolution: list[int],
         cpu_offload: bool = False,
     ) -> None:
         super().__init__()
         self.model = model
         self.num_steps = num_steps
         self.guidance = guidance
+        self.resolution = resolution
         self.cpu_offload = cpu_offload
         if cpu_offload:
             self.model.flow = self.model.flow.cpu()
@@ -46,7 +48,7 @@ class FluxImageQuant(ImageQuant):
         resolution: list[int] | None = None,
         cond_images: list[torch.Tensor] | None = None,
     ) -> ImageOutput:
-        height, width = resolution or [1024, 1024]
+        height, width = resolution or self.resolution
         if seed is None:
             seed = random.randint(0, 2**31 - 1)
 

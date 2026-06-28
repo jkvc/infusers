@@ -6,6 +6,7 @@ defaults:
 _target_: infusers.quant.flux.image.FluxImageQuant
 num_steps: 4
 guidance: 1.0
+resolution: [1024, 1024]
 cpu_offload: true
 model:
   load_flow_on_cpu: true
