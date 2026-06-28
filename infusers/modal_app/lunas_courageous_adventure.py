@@ -121,20 +121,26 @@ class LunasCourageousAdventure(GenericModelRunner):
 def smoke(
     prompt: str = "solid red square on white background",
     seed: int = 42,
+    num_steps: int | None = None,
 ) -> None:
     """CLI smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke"""
     service = LunasCourageousAdventure()
     t0 = time.perf_counter()
 
+    inputs: dict[str, object] = {"prompt": prompt, "seed": seed, "resolution": [512, 512]}
+    if num_steps is not None:
+        inputs["num_steps"] = num_steps
+
     body = {
         "path": "klein9b.image",
-        "inputs": {"prompt": prompt, "seed": seed, "resolution": [512, 512]},
+        "inputs": inputs,
     }
     response = service.run_remote.remote(body)
     elapsed = time.perf_counter() - t0
 
     image_b64 = response["result"]["image"]
-    out = Path("/tmp/klein-smoke.webp")
+    step_label = num_steps if num_steps is not None else "default"
+    out = Path(f"/tmp/klein-smoke-steps-{step_label}.webp")
     out.write_bytes(base64.b64decode(image_b64))
     meta = response.get("metadata", {})
     print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")

@@ -174,8 +174,10 @@ class FluxImageQuant(ImageQuant):
         seed: int | None = None,
         resolution: list[int] | None = None,
         cond_images: list[torch.Tensor] | None = None,
+        num_steps: int | None = None,
     ) -> Iterator[ImageIntermediateEvent | ImageOutput]:
         height, width = resolution or self.resolution
+        steps = self.num_steps if num_steps is None else num_steps
         if seed is None:
             seed = random.randint(0, 2**31 - 1)
 
@@ -212,7 +214,7 @@ class FluxImageQuant(ImageQuant):
         randn = torch.randn(shape, generator=generator, dtype=torch.bfloat16, device=device)
         x, x_ids = batched_prc_img(randn)
 
-        timesteps = get_schedule(self.num_steps, x.shape[1])
+        timesteps = get_schedule(steps, x.shape[1])
         total_steps = max(len(timesteps) - 1, 0)
         yield ImageIntermediateEvent(message=f"denoise begin ({total_steps} steps)")
 
