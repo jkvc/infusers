@@ -36,6 +36,8 @@ def summarize_output_value(key: str, value: Any) -> dict[str, Any]:
 
 
 def _summarize_value(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
     if isinstance(value, dict):
         return {k: _summarize_value(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
