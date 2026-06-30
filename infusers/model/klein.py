@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import torch
@@ -67,6 +68,34 @@ def _load_text_encoder_compat(model_name: str, device: torch.device) -> Qwen3Emb
     return embedder.eval()
 
 
+def _load_klein_modules(
+    *,
+    model_name: str,
+    device: torch.device,
+    flow_device: torch.device,
+    parallel_load: bool,
+) -> tuple[Qwen3Embedder, nn.Module, nn.Module]:
+    """Load text encoder, flow, and VAE — optionally in parallel (I/O overlap)."""
+
+    def _text_encoder() -> Qwen3Embedder:
+        return _load_text_encoder_compat(model_name, device=device)
+
+    def _flow() -> nn.Module:
+        return load_flow_model(model_name, device=flow_device)
+
+    def _ae() -> nn.Module:
+        return load_ae(model_name, device=device)
+
+    if not parallel_load:
+        return _text_encoder(), _flow(), _ae()
+
+    with ThreadPoolExecutor(max_workers=3, thread_name_prefix="klein-load") as pool:
+        fut_te = pool.submit(_text_encoder)
+        fut_flow = pool.submit(_flow)
+        fut_ae = pool.submit(_ae)
+        return fut_te.result(), fut_flow.result(), fut_ae.result()
+
+
 class KleinModel(nn.Module):
     """Loaded Klein flow, VAE, and text encoder — no steps/guidance/resolution state."""
 
@@ -80,6 +109,7 @@ class KleinModel(nn.Module):
         weights_dir: str | Path | None = None,
         hf_home: str | Path | None = None,
         load_flow_on_cpu: bool = False,
+        parallel_load: bool = True,
     ) -> None:
         super().__init__()
         if not torch.cuda.is_available():
@@ -99,10 +129,13 @@ class KleinModel(nn.Module):
         self.model_info = FLUX2_MODEL_INFO[self.model_name]
         self.device = torch.device("cuda")
 
-        text_encoder = _load_text_encoder_compat(self.model_name, device=self.device)
         flow_device = torch.device("cpu") if load_flow_on_cpu else self.device
-        flow = load_flow_model(self.model_name, device=flow_device)
-        ae = load_ae(self.model_name, device=self.device)
+        text_encoder, flow, ae = _load_klein_modules(
+            model_name=self.model_name,
+            device=self.device,
+            flow_device=flow_device,
+            parallel_load=parallel_load,
+        )
         text_encoder.eval()
         flow.eval()
         ae.eval()

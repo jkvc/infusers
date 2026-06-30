@@ -4,6 +4,16 @@ Known shortcuts and deferred work. Record every conscious shortcut here; delete 
 
 ## Active
 
+### GPU memory snapshots not viable for Klein 9B on Modal
+
+**Added:** 2026-06-30
+
+**What:** Modal GPU memory snapshots tested on L40S/H100/A100 with Klein 9B. L40S/H100: snapshot create fails after load. A100: create works, restore fails when HF cache on Volume (xet logs on 9p). Cold boot ~60s is Volume read I/O (~27GB); parallel load saves ~4s (now default in `KleinModel`); local copy and CPU-only snapshots did not help.
+
+**Why:** Alpha GPU snapshot feature; Klein GPU state too large/incompatible on most GPUs; Volume mount is the cold-start bottleneck.
+
+**Fix:** No snapshots on `lunas_courageous_adventure`. Use `scaledown_window=300`, `parallel_load=True`, or accept ~60s cold.
+
 ### Klein 4B public endpoint not yet deployed
 
 **Added:** 2026-06-08 (updated 2026-06-28)
