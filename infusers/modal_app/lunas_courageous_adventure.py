@@ -71,6 +71,7 @@ class LunasCourageousAdventure(GenericModelRunner):
             ],
             allowed_input_translators={
                 "cond_images": ["list_apply[imageb64_to_tensor]"],
+                "signal_rgba": ["rgba_b64_to_tensor"],
             },
         ),
         RouteDef(
@@ -256,6 +257,81 @@ def smoke_pano(
         f"slices={result.get('num_slices')} overlap={result.get('overlap_pixels')}"
     )
     print(f"metadata: {meta}")
+
+
+@app.local_entrypoint()
+def smoke_vnsdedit(
+    seed: int = 42,
+    num_steps: int = 20,
+) -> None:
+    """CLI vnsdedit smoke: uv run modal run ...::smoke_vnsdedit"""
+    import io
+
+    from PIL import Image
+
+    from infusers.quant.flux.vnsdedit import compute_radial_mask
+
+    service = LunasCourageousAdventure()
+    resolution = [512, 512]
+    height, width = resolution
+    prompt = "solid red square on white background"
+    t0 = time.perf_counter()
+
+    t2i = service.run_remote.remote(
+        {
+            "path": "klein9b.image",
+            "inputs": {
+                "prompt": prompt,
+                "seed": seed,
+                "resolution": resolution,
+                "num_steps": 4,
+            },
+        }
+    )
+    base_pil = Image.open(io.BytesIO(base64.b64decode(t2i["result"]["image"]))).convert("RGB")
+    radius_px = 0.22 * min(width, height)
+    core_radius_px = 0.06 * min(width, height)
+    mask = compute_radial_mask(
+        width=width,
+        height=height,
+        click_x=width // 2,
+        click_y=height // 2,
+        edit_max=1.0,
+        radius_px=radius_px,
+        core_radius_px=core_radius_px,
+        falloff_shape="cosine",
+    )
+    mask_alpha = (mask[0].numpy() * 255).astype("uint8")
+    rgba_pil = Image.merge(
+        "RGBA",
+        (
+            base_pil.getchannel("R"),
+            base_pil.getchannel("G"),
+            base_pil.getchannel("B"),
+            Image.fromarray(mask_alpha, mode="L"),
+        ),
+    )
+    buf = io.BytesIO()
+    rgba_pil.save(buf, format="PNG")
+    signal_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    edited = service.run_remote.remote(
+        {
+            "path": "klein9b.image",
+            "inputs": {
+                "prompt": prompt,
+                "seed": seed + 1,
+                "resolution": resolution,
+                "num_steps": num_steps,
+                "signal_rgba": signal_b64,
+            },
+            "translator": {"signal_rgba": "rgba_b64_to_tensor"},
+        }
+    )
+    out = Path(f"/tmp/klein-smoke-vnsdedit-s{num_steps}.webp")
+    out.write_bytes(base64.b64decode(edited["result"]["image"]))
+    print(f"done in {time.perf_counter() - t0:.1f}s -> {out}")
+    print(f"metadata: {edited.get('metadata', {})}")
 
 
 @app.local_entrypoint()

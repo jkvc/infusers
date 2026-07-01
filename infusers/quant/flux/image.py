@@ -24,6 +24,31 @@ from infusers.quant.api.image_base import (
     ImageQuant,
     chw_float01_to_pil,
 )
+from infusers.quant.flux.vnsdedit import (
+    SignalBlendState,
+    blend_with_signal_and_mask,
+    encode_signal_blend,
+    split_signal_rgba,
+    validate_signal_rgba,
+)
+
+
+def _maybe_blend_signal(
+    img: Tensor,
+    t_prev: float,
+    signal_blend: SignalBlendState | None,
+) -> Tensor:
+    if signal_blend is None:
+        return img
+    return blend_with_signal_and_mask(
+        img,
+        signal_blend.signal_latent,
+        signal_blend.signal_mask_latent,
+        signal_blend.noise_spatial,
+        t_prev,
+        signal_blend.latent_h,
+        signal_blend.latent_w,
+    )
 
 
 def _iter_denoise(
@@ -36,6 +61,7 @@ def _iter_denoise(
     guidance: float,
     img_cond_seq: Tensor | None = None,
     img_cond_seq_ids: Tensor | None = None,
+    signal_blend: SignalBlendState | None = None,
 ) -> Iterator[tuple[int, int]]:
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     total = max(len(timesteps) - 1, 0)
@@ -59,6 +85,7 @@ def _iter_denoise(
         if img_input_ids is not None:
             pred = pred[:, : img.shape[1]]
         img = img + (t_prev - t_curr) * pred
+        img = _maybe_blend_signal(img, t_prev, signal_blend)
     return img
 
 
@@ -72,6 +99,7 @@ def _iter_denoise_cached(
     guidance: float,
     img_cond_seq: Tensor,
     img_cond_seq_ids: Tensor,
+    signal_blend: SignalBlendState | None = None,
 ) -> Iterator[tuple[int, int]]:
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
     total = max(len(timesteps) - 1, 0)
@@ -101,6 +129,7 @@ def _iter_denoise_cached(
                 kv_cache=kv_cache,
             )
         img = img + (t_prev - t_curr) * pred
+        img = _maybe_blend_signal(img, t_prev, signal_blend)
     return img
 
 
@@ -114,6 +143,7 @@ def _iter_denoise_cfg(
     guidance: float,
     img_cond_seq: Tensor | None = None,
     img_cond_seq_ids: Tensor | None = None,
+    signal_blend: SignalBlendState | None = None,
 ) -> Iterator[tuple[int, int]]:
     img = torch.cat([img, img], dim=0)
     img_ids = torch.cat([img_ids, img_ids], dim=0)
@@ -145,6 +175,7 @@ def _iter_denoise_cfg(
         pred = pred_uncond + guidance * (pred_cond - pred_uncond)
         pred = torch.cat([pred, pred], dim=0)
         img = img + (t_prev - t_curr) * pred
+        img = _maybe_blend_signal(img, t_prev, signal_blend)
     return img.chunk(2)[0]
 
 
@@ -174,6 +205,7 @@ class FluxImageQuant(ImageQuant):
         seed: int | None = None,
         resolution: list[int] | None = None,
         cond_images: list[torch.Tensor] | None = None,
+        signal_rgba: torch.Tensor | None = None,
         num_steps: int | None = None,
     ) -> Iterator[ImageIntermediateEvent | ImageOutput]:
         height, width = resolution or self.resolution
@@ -186,6 +218,8 @@ class FluxImageQuant(ImageQuant):
         flow = self.model.flow
         ae = self.model.ae
         model_info = self.model.model_info
+
+        signal_blend: SignalBlendState | None = None
 
         yield ImageIntermediateEvent(message="encode prompt")
 
@@ -214,6 +248,19 @@ class FluxImageQuant(ImageQuant):
         randn = torch.randn(shape, generator=generator, dtype=torch.bfloat16, device=device)
         x, x_ids = batched_prc_img(randn)
 
+        if signal_rgba is not None:
+            yield ImageIntermediateEvent(message="encode signal")
+            validate_signal_rgba(signal_rgba, height, width)
+            signal_rgb, signal_mask = split_signal_rgba(signal_rgba.to(device))
+            signal_blend = encode_signal_blend(
+                ae,
+                signal_rgb,
+                signal_mask,
+                randn,
+                device=device,
+                dtype=torch.bfloat16,
+            )
+
         timesteps = get_schedule(steps, x.shape[1])
         total_steps = max(len(timesteps) - 1, 0)
         yield ImageIntermediateEvent(message=f"denoise begin ({total_steps} steps)")
@@ -230,6 +277,7 @@ class FluxImageQuant(ImageQuant):
                     guidance=self.guidance,
                     img_cond_seq=ref_tokens,
                     img_cond_seq_ids=ref_ids,
+                    signal_blend=signal_blend,
                 )
             else:
                 denoise_iter = _iter_denoise(
@@ -242,6 +290,7 @@ class FluxImageQuant(ImageQuant):
                     guidance=self.guidance,
                     img_cond_seq=ref_tokens,
                     img_cond_seq_ids=ref_ids,
+                    signal_blend=signal_blend,
                 )
         else:
             denoise_iter = _iter_denoise_cfg(
@@ -254,6 +303,7 @@ class FluxImageQuant(ImageQuant):
                 guidance=self.guidance,
                 img_cond_seq=ref_tokens,
                 img_cond_seq_ids=ref_ids,
+                signal_blend=signal_blend,
             )
 
         try:

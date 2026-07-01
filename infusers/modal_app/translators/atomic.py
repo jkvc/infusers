@@ -11,7 +11,11 @@ from PIL import Image
 
 from infusers.modal_app.translators.context import TranslatorContext
 from infusers.modal_app.translators.registry import register
-from infusers.quant.api.image_base import chw_float01_to_pil, pil_to_chw_float01
+from infusers.quant.api.image_base import (
+    chw_float01_to_pil,
+    pil_rgba_to_chw_float01,
+    pil_to_chw_float01,
+)
 
 
 def _require_device(ctx: TranslatorContext) -> torch.device:
@@ -54,6 +58,17 @@ class ImageB64ToTensor:
         return "ImageB64ToTensor()"
 
 
+class RgbaB64ToTensor:
+    def __call__(self, value: str, ctx: TranslatorContext) -> torch.Tensor:
+        device = _require_device(ctx)
+        raw = base64.b64decode(value)
+        pil = Image.open(io.BytesIO(raw)).convert("RGBA")
+        return pil_rgba_to_chw_float01(pil, device)
+
+    def __repr__(self) -> str:
+        return "RgbaB64ToTensor()"
+
+
 class TensorToWebpB64:
     def __call__(self, value: torch.Tensor, _ctx: TranslatorContext) -> str:
         pil = chw_float01_to_pil(value)
@@ -93,6 +108,11 @@ def _get_attr_dsl(field: str) -> GetAttr:
 @register("imageb64_to_tensor")
 def _imageb64_to_tensor_dsl(_value: str | None = None) -> ImageB64ToTensor:
     return ImageB64ToTensor()
+
+
+@register("rgba_b64_to_tensor")
+def _rgba_b64_to_tensor_dsl(_value: str | None = None) -> RgbaB64ToTensor:
+    return RgbaB64ToTensor()
 
 
 @register("tensor_to_webp_b64")

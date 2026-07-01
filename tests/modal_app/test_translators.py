@@ -56,3 +56,18 @@ def test_list_apply_imageb64_to_tensor() -> None:
 def test_imageb64_requires_device() -> None:
     with pytest.raises(RuntimeError, match="device is required"):
         apply("imageb64_to_tensor", _solid_red_png_b64(), TranslatorContext())
+
+
+def _solid_rgba_png_b64(alpha: int = 255) -> str:
+    pil = Image.new("RGBA", (8, 8), color=(10, 20, 30, alpha))
+    buf = io.BytesIO()
+    pil.save(buf, format="PNG")
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+
+def test_rgba_b64_to_tensor_shape() -> None:
+    ctx = TranslatorContext(device=torch.device("cpu"))
+    tensor = apply("rgba_b64_to_tensor", _solid_rgba_png_b64(128), ctx)
+    assert tensor.shape == (4, 8, 8)
+    assert tensor[0, 0, 0].item() == pytest.approx(10 / 255.0, abs=0.02)
+    assert tensor[3, 0, 0].item() == pytest.approx(128 / 255.0, abs=0.02)

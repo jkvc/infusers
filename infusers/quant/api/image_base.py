@@ -31,6 +31,13 @@ def pil_to_chw_float01(image: Image.Image, device: torch.device) -> torch.Tensor
     return arr.permute(2, 0, 1).to(device)
 
 
+def pil_rgba_to_chw_float01(image: Image.Image, device: torch.device) -> torch.Tensor:
+    import numpy as np
+
+    arr = torch.from_numpy(np.array(image.convert("RGBA"), dtype=np.float32) / 255.0)
+    return arr.permute(2, 0, 1).to(device)
+
+
 def chw_float01_to_pil(tensor: torch.Tensor) -> Image.Image:
     import numpy as np
 
@@ -50,6 +57,8 @@ class ImageQuant(TorchQuant[ImageIntermediateEvent, ImageOutput]):
         seed: int | None = None,
         resolution: list[int] | None = None,
         cond_images: list[torch.Tensor] | None = None,
+        signal_rgba: torch.Tensor | None = None,
+        num_steps: int | None = None,
     ) -> Iterator[ImageIntermediateEvent | ImageOutput]: ...
 
     @override
@@ -72,6 +81,8 @@ class DummyImageQuant(ImageQuant):
         seed: int | None = None,
         resolution: list[int] | None = None,
         cond_images: list[torch.Tensor] | None = None,
+        signal_rgba: torch.Tensor | None = None,
+        num_steps: int | None = None,
     ) -> Iterator[ImageIntermediateEvent | ImageOutput]:
         height, width = resolution or self.resolution
         if seed is None:
