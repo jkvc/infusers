@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Iterator
 
 import torch
 
@@ -58,6 +59,62 @@ def test_bridge_surfaces_producer_error() -> None:
     frames = list(bridge.iter_frames())
     assert frames[-1].kind == "error"
     assert str(frames[-1].value) == "boom"
+
+
+def _slow_forward_gen(
+    *,
+    num_steps: int,
+    step_work_s: float,
+) -> Iterator[IntermediateEvent | ImageOutput]:
+    for step in range(num_steps):
+        yield IntermediateEvent(message=f"step {step}")
+        time.sleep(step_work_s)
+    yield ImageOutput(message="done", image=torch.zeros(3, 1, 1))
+
+
+def test_producer_finishes_without_consumer() -> None:
+    """Inference thread must not wait for iter_frames() or SSE drain."""
+    num_steps = 4
+    step_work_s = 0.025
+    bridge = BoundedProgressBridge(max_intermediate=2)
+    thread = run_generator_in_thread(
+        bridge,
+        lambda: _slow_forward_gen(num_steps=num_steps, step_work_s=step_work_s),
+        lambda item: isinstance(item, IntermediateEvent),
+    )
+
+    max_producer_s = num_steps * step_work_s + 0.15
+    thread.join(timeout=max_producer_s)
+    assert not thread.is_alive()
+
+    frames = list(bridge.iter_frames())
+    assert frames[-1].kind == "final"
+
+
+def test_producer_finishes_before_slow_consumer_drains() -> None:
+    """Stalled SSE consumer must not extend GPU/inference wall time."""
+    num_steps = 4
+    step_work_s = 0.025
+    consumer_stall_s = 0.2
+    bridge = BoundedProgressBridge(max_intermediate=2)
+    thread = run_generator_in_thread(
+        bridge,
+        lambda: _slow_forward_gen(num_steps=num_steps, step_work_s=step_work_s),
+        lambda item: isinstance(item, IntermediateEvent),
+    )
+
+    max_producer_s = num_steps * step_work_s + 0.15
+    thread.join(timeout=max_producer_s)
+    assert not thread.is_alive()
+
+    final: ImageOutput | None = None
+    for frame in bridge.iter_frames():
+        time.sleep(consumer_stall_s)
+        if frame.kind == "final":
+            final = frame.value
+            break
+
+    assert isinstance(final, ImageOutput)
 
 
 def test_run_generator_in_thread_with_dummy_quant() -> None:
