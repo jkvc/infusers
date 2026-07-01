@@ -36,4 +36,4 @@ def test_pano_two_slice_horizontal_smoke(skip_without_gpu: None) -> None:
     assert isinstance(out, PanoramaOutput)
     dims = compute_canvas_dims(2, 256, 512, 128, "horizontal")
     assert out.output_size == [dims.output_height, dims.output_width]
-    assert out.image.shape == (3, dims.output_height, dims.output_width)
+    assert out.images.shape == (1, 3, dims.output_height, dims.output_width)

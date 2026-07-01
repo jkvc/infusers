@@ -169,11 +169,12 @@ def main() -> int:
             continue
 
         elapsed = time.perf_counter() - t0
-        image_b64 = response.get("result", {}).get("image")
-        if not image_b64:
-            results.append({"name": name, "ok": False, "error": "no image in response"})
+        image_b64_list = response.get("result", {}).get("images")
+        if not image_b64_list:
+            results.append({"name": name, "ok": False, "error": "no images in response"})
             continue
 
+        image_b64 = image_b64_list[0]
         raw = base64.b64decode(image_b64)
         webp_path = out_dir / f"{name}.webp"
         webp_path.write_bytes(raw)

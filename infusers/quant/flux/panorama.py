@@ -21,6 +21,7 @@ from torch import Tensor
 from infusers.model.klein import KleinModel
 from infusers.quant.api.image_base import chw_float01_to_pil
 from infusers.quant.api.pano_base import (
+    CHWTensor,
     PanoramaIntermediateEvent,
     PanoramaOutput,
     PanoramaQuant,
@@ -557,11 +558,11 @@ class FluxPanoramaQuant(PanoramaQuant):
         )
         decoded = _decode_pano_latent(ae, img_spatial, dims, direction)
         decoded = decoded.clamp(-1, 1)
-        chw = ((decoded[0] + 1.0) / 2.0).float()
+        chw: CHWTensor = ((decoded[0] + 1.0) / 2.0).float()
 
         yield PanoramaOutput(
             message="panorama ready",
-            image=chw,
+            images=chw.unsqueeze(0),
             direction=direction,
             slice_resolution=list(slice_resolution),
             output_size=[dims.output_height, dims.output_width],

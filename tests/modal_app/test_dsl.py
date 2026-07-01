@@ -12,7 +12,14 @@ from infusers.modal_app.translators.registry import registered_names
 
 def test_registered_names_include_core_translators() -> None:
     names = registered_names()
-    for expected in ("imageb64_to_tensor", "tensor_to_webp_b64", "get_attr", "list_apply", "pipe"):
+    for expected in (
+        "imageb64_to_tensor",
+        "tensor_to_webp_b64",
+        "nchw_to_webp_b64_list",
+        "get_attr",
+        "list_apply",
+        "pipe",
+    ):
         assert expected in names
 
 
@@ -62,6 +69,20 @@ def test_apply_klein_output_chain_cpu() -> None:
     b64 = apply_chain([GetAttr("image"), TensorToWebpB64()], fake, TranslatorContext())
     assert isinstance(b64, str)
     assert len(b64) > 0
+
+
+def test_apply_pano_nchw_output_chain_cpu() -> None:
+    from infusers.modal_app.translators.atomic import NCHWToWebpB64List
+    from infusers.modal_app.translators.registry import apply_chain
+
+    images = torch.zeros(2, 3, 4, 4)
+    images[0, 0, :, :] = 1.0
+    images[1, 2, :, :] = 1.0
+
+    b64_list = apply_chain([NCHWToWebpB64List()], images, TranslatorContext())
+    assert isinstance(b64_list, list)
+    assert len(b64_list) == 2
+    assert all(isinstance(item, str) and len(item) > 0 for item in b64_list)
 
 
 def test_parse_invalid_atom_raises() -> None:

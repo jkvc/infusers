@@ -120,7 +120,11 @@ def main(
 
     infer_start = time.perf_counter()
     out = quant(**kwargs)
-    pil = chw_float01_to_pil(out.image)
+    if out.images.shape[0] != 1:
+        raise click.ClickException(
+            f"Expected one panorama image (N=1), got batch size {out.images.shape[0]}"
+        )
+    pil = chw_float01_to_pil(out.images[0])
     out_name = _output_name(prompts)
     out_path = output_dir / out_name
     pil.save(out_path)

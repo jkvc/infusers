@@ -65,6 +65,21 @@ class TensorToWebpB64:
         return "TensorToWebpB64()"
 
 
+class NCHWToWebpB64List:
+    """Encode each batch item in an NCHW tensor as a WebP base64 string."""
+
+    def __call__(self, value: torch.Tensor, ctx: TranslatorContext) -> list[str]:
+        if value.ndim != 4:
+            raise TypeError(
+                f"NCHWToWebpB64List expects a 4D NCHW tensor, got shape {tuple(value.shape)}"
+            )
+        encoder = TensorToWebpB64()
+        return [encoder(value[i], ctx) for i in range(value.shape[0])]
+
+    def __repr__(self) -> str:
+        return "NCHWToWebpB64List()"
+
+
 @register("identity")
 def _identity_dsl(_value: str | None = None) -> Identity:
     return Identity()
@@ -83,3 +98,8 @@ def _imageb64_to_tensor_dsl(_value: str | None = None) -> ImageB64ToTensor:
 @register("tensor_to_webp_b64")
 def _tensor_to_webp_b64_dsl(_value: str | None = None) -> TensorToWebpB64:
     return TensorToWebpB64()
+
+
+@register("nchw_to_webp_b64_list")
+def _nchw_to_webp_b64_list_dsl(_value: str | None = None) -> NCHWToWebpB64List:
+    return NCHWToWebpB64List()

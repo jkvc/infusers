@@ -145,6 +145,8 @@ curl -X POST "$MODAL_WEB_URL" \
   }' | jq .
 ```
 
+Pano response shape: `{ "result": { "images": ["<webp base64>", ...], "direction": "...", ... }, "metadata": { ... } }`. Single-pano routes return a one-element list.
+
 CLI pano smoke: `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano`
 
 ## pytest (local)

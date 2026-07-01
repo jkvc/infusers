@@ -11,7 +11,7 @@ from typing import Any
 import modal
 
 from infusers.modal_app.base import GenericModelRunner, OutputMapping, RouteDef, RunnerError
-from infusers.modal_app.translators.atomic import TensorToWebpB64
+from infusers.modal_app.translators.atomic import NCHWToWebpB64List, TensorToWebpB64
 from infusers.model.weights import FLOW_FILENAME
 
 APP_NAME = "lunas-courageous-adventure"
@@ -76,7 +76,11 @@ class LunasCourageousAdventure(GenericModelRunner):
                 OutputMapping(consume_from="message", produce_to="message"),
             ],
             final_outputs=[
-                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+                OutputMapping(
+                    consume_from="images",
+                    produce_to="images",
+                    translators=[NCHWToWebpB64List()],
+                ),
                 OutputMapping(consume_from="direction", produce_to="direction"),
                 OutputMapping(consume_from="slice_resolution", produce_to="slice_resolution"),
                 OutputMapping(consume_from="output_size", produce_to="output_size"),
@@ -231,13 +235,18 @@ def smoke_pano(
     response = service.run_remote.remote(body)
     elapsed = time.perf_counter() - t0
 
-    image_b64 = response["result"]["image"]
+    images_b64 = response["result"]["images"]
+    if not images_b64:
+        raise RuntimeError("smoke_pano: empty result.images")
     step_label = num_steps if num_steps is not None else "default"
     out = Path(f"/tmp/klein-smoke-pano-steps-{step_label}.webp")
-    out.write_bytes(base64.b64decode(image_b64))
+    out.write_bytes(base64.b64decode(images_b64[0]))
     meta = response.get("metadata", {})
     result = response.get("result", {})
-    print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
+    print(
+        f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes, "
+        f"{len(images_b64)} image(s))"
+    )
     print(
         f"output: {result.get('output_size')} direction={result.get('direction')} "
         f"slices={result.get('num_slices')} overlap={result.get('overlap_pixels')}"

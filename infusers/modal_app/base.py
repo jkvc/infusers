@@ -20,7 +20,7 @@ from infusers.modal_app.stream import (
     encode_sse,
     run_generator_in_thread,
 )
-from infusers.modal_app.translators.atomic import TensorToWebpB64
+from infusers.modal_app.translators.atomic import NCHWToWebpB64List, TensorToWebpB64
 from infusers.modal_app.translators.context import TranslatorContext
 from infusers.modal_app.translators.dsl import apply
 from infusers.modal_app.translators.registry import TranslatorFn, apply_chain, registered_names
@@ -234,6 +234,8 @@ class GenericModelRunner:
 
     @staticmethod
     def _wire_type(mapping: OutputMapping) -> str:
+        if any(isinstance(step, NCHWToWebpB64List) for step in mapping.translators):
+            return "list of string (webp base64)"
         if any(isinstance(step, TensorToWebpB64) for step in mapping.translators):
             return "string (webp base64)"
         return "pass-through"

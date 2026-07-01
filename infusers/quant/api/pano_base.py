@@ -5,11 +5,16 @@ from __future__ import annotations
 import abc
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import TypeAlias
 
 import torch
 from reqm.overrides_ext import override
 
 from infusers.quant.api.base import FinalEvent, IntermediateEvent, TorchQuant
+
+# Document-only shape hints — not enforced at runtime.
+CHWTensor: TypeAlias = torch.Tensor
+NCHWTensor: TypeAlias = torch.Tensor
 
 
 @dataclass(frozen=True)
@@ -19,7 +24,7 @@ class PanoramaIntermediateEvent(IntermediateEvent):
 
 @dataclass(frozen=True)
 class PanoramaOutput(FinalEvent):
-    image: torch.Tensor  # float32 CHW [0, 1] on quant device
+    images: NCHWTensor  # float32 (N, C, H, W) in [0, 1] on quant device; N=1 for single pano
     direction: str
     slice_resolution: list[int]
     output_size: list[int]
