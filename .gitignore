@@ -41,6 +41,9 @@ Thumbs.db
 # pytest
 .pytest_cache/
 
+# Local temp output (galleries, print layouts, experiments)
+tmp/
+
 # Local inference outputs
 .model-out/
 

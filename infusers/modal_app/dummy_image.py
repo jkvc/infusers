@@ -46,7 +46,11 @@ class DummyImageRunner(GenericModelRunner):
                 OutputMapping(consume_from="message", produce_to="message"),
             ],
             final_outputs=[
-                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+                OutputMapping(
+                    consume_from="image",
+                    produce_to="image",
+                    translators=[TensorToWebpB64()],
+                ),
             ],
             allowed_input_translators={},
         ),

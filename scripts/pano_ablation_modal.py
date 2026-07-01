@@ -187,9 +187,7 @@ def main() -> int:
             "webp": str(webp_path.relative_to(repo_root)),
             "output_size": [img.height, img.width],
             "num_slices": len(case["prompts"]),
-            "inputs": {
-                k: v for k, v in inputs.items() if k != "prompts"
-            },
+            "inputs": {k: v for k, v in inputs.items() if k != "prompts"},
             "metadata": meta,
         }
         results.append(entry)

@@ -16,11 +16,15 @@ You are **never allowed** to commit or push any code unless the user explicitly 
 
 Never commit `.env` files, API keys, or tokens. Modal auth lives in `~/.modal.toml`; Hugging Face auth via `uv run hf auth login` (`~/.cache/huggingface/token`). Both are gitignored.
 
-### 3. Keep CLAUDE.md Stable
+### 3. Local Temp Output
+
+All ephemeral local output (generation galleries, print PDFs/HTML, comparison sheets, ablation dumps, ad-hoc image batches) goes under **`tmp/`** at the repo root. Create a subdir per task (e.g. `tmp/lille-a4/`). Never commit `tmp/` — it is gitignored. Do not write these artifacts to `print/`, repo root, or `/tmp` on the machine.
+
+### 4. Keep CLAUDE.md Stable
 
 Do **not** add frequently-changing content to this file (per-app env vars, pinned model versions, deployment URLs). This file is for stable rules and conventions. Put implementation detail in code comments, README, or `notes/`.
 
-### 4. Package Manager
+### 5. Package Manager
 
 This project uses **uv**. Never use bare `pip install` outside the uv-managed environment.
 
@@ -28,7 +32,7 @@ This project uses **uv**. Never use bare `pip install` outside the uv-managed en
 - Run a command in the venv: `uv run <cmd>`
 - Add a dependency: `uv add <package>` (runtime) or `uv add --dev <package>`
 
-### 5. Modal CLI
+### 6. Modal CLI
 
 Modal is a **dev dependency**. Always run `uv run modal …`, not bare `modal`.
 
@@ -38,7 +42,7 @@ Modal is a **dev dependency**. Always run `uv run modal …`, not bare `modal`.
 
 See [`docs/modal.md`](docs/modal.md) for staging weights, Volume upload, and smoke tests.
 
-### 6. Repository Layout
+### 7. Repository Layout
 
 ```
 infusers/
@@ -51,6 +55,7 @@ infusers/
 ├── docs/              # Operational guides (e.g. modal.md)
 ├── scripts/           # Weight staging, upload, smoke tests
 ├── tests/             # pytest
+├── tmp/               # gitignored local temp output (galleries, print, experiments)
 └── notes/             # Design notes (yyyymmdd-slug.md)
 ```
 
@@ -59,18 +64,18 @@ infusers/
 - **Pin dependency versions** in Modal image `pip_install` lists for reproducible remote builds.
 - **YAML configs** must start with `# @package _global_`; run `QM.validate()` in tests/CI.
 
-### 7. Model Loading Convention
+### 8. Model Loading Convention
 
 Weights come from Hugging Face. Use **diffusers** for standard pipeline routes; port denoise loops from BFL's [`flux2`](https://github.com/black-forest-labs/flux2) reference when building custom inferencers. Do not passthrough hosted Klein SKUs — custom algorithms are the product.
 
-### 8. Track Tech Debt
+### 9. Track Tech Debt
 
 Known shortcuts and deferred work go in [`TECH_DEBT.md`](TECH_DEBT.md). Record every conscious shortcut; delete entries once resolved.
 
-### 9. Prose Line Wrapping
+### 10. Prose Line Wrapping
 
 Do **not** hard-wrap paragraphs in Markdown. Write each paragraph / list item as a single unwrapped line. Blank lines still separate blocks.
 
-### 10. Testing
+### 11. Testing
 
 Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for Modal glue and config-only changes where they add no signal.

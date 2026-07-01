@@ -5,7 +5,6 @@ from __future__ import annotations
 import abc
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TypeAlias
 
 import torch
 from reqm.overrides_ext import override
@@ -13,8 +12,8 @@ from reqm.overrides_ext import override
 from infusers.quant.api.base import FinalEvent, IntermediateEvent, TorchQuant
 
 # Document-only shape hints — not enforced at runtime.
-CHWTensor: TypeAlias = torch.Tensor
-NCHWTensor: TypeAlias = torch.Tensor
+type CHWTensor = torch.Tensor
+type NCHWTensor = torch.Tensor
 
 
 @dataclass(frozen=True)

@@ -63,7 +63,11 @@ class LunasCourageousAdventure(GenericModelRunner):
                 OutputMapping(consume_from="message", produce_to="message"),
             ],
             final_outputs=[
-                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+                OutputMapping(
+                    consume_from="image",
+                    produce_to="image",
+                    translators=[TensorToWebpB64()],
+                ),
             ],
             allowed_input_translators={
                 "cond_images": ["list_apply[imageb64_to_tensor]"],
@@ -214,7 +218,7 @@ def smoke_pano(
     seed: int = 42,
     num_steps: int | None = None,
 ) -> None:
-    """CLI pano smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano"""
+    """CLI pano smoke: modal run .../lunas_courageous_adventure.py::smoke_pano"""
     service = LunasCourageousAdventure()
     t0 = time.perf_counter()
 

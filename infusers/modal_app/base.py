@@ -227,10 +227,7 @@ class GenericModelRunner:
 
     @staticmethod
     def _summarize_wire_payload(payload: dict[str, Any]) -> dict[str, Any]:
-        return {
-            key: summarize_output_value(key, value)["value"]
-            for key, value in payload.items()
-        }
+        return {key: summarize_output_value(key, value)["value"] for key, value in payload.items()}
 
     @staticmethod
     def _wire_type(mapping: OutputMapping) -> str:
@@ -352,9 +349,7 @@ class GenericModelRunner:
                 "allowed_input_translators": route.allowed_input_translators,
                 "final_outputs": [self._mapping_spec(m) for m in route.final_outputs],
                 "intermediate_outputs": [self._mapping_spec(m) for m in route.intermediate_outputs],
-                "output_schema": {
-                    m.produce_to: self._wire_type(m) for m in route.final_outputs
-                },
+                "output_schema": {m.produce_to: self._wire_type(m) for m in route.final_outputs},
                 "stream_schema": {
                     "progress": {
                         m.produce_to: self._wire_type(m) for m in route.intermediate_outputs
