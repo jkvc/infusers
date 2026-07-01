@@ -67,7 +67,7 @@ Response shape: `{ "result": { "image": "<webp base64>" }, "metadata": { ... } }
 Streaming (SSE) — same request body, POST to the `/stream` endpoint (label varies by deploy). Events:
 
 ```json
-{"kind":"progress","message":"denoise step 1/4"}
+{"kind":"progress","progress":{"message":"denoise step 1/4"}}
 {"kind":"result","result":{"image":"<webp b64>"},"metadata":{...}}
 ```
 

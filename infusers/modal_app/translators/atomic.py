@@ -24,6 +24,9 @@ class Identity:
     def __call__(self, value: Any, _ctx: TranslatorContext) -> Any:
         return value
 
+    def __repr__(self) -> str:
+        return "Identity()"
+
 
 class GetAttr:
     def __init__(self, field: str) -> None:
@@ -47,6 +50,9 @@ class ImageB64ToTensor:
         pil = Image.open(io.BytesIO(raw)).convert("RGB")
         return pil_to_chw_float01(pil, device)
 
+    def __repr__(self) -> str:
+        return "ImageB64ToTensor()"
+
 
 class TensorToWebpB64:
     def __call__(self, value: torch.Tensor, _ctx: TranslatorContext) -> str:
@@ -54,6 +60,9 @@ class TensorToWebpB64:
         buf = io.BytesIO()
         pil.save(buf, format="WEBP", quality=90)
         return base64.b64encode(buf.getvalue()).decode("ascii")
+
+    def __repr__(self) -> str:
+        return "TensorToWebpB64()"
 
 
 @register("identity")

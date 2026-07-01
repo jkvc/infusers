@@ -10,9 +10,8 @@ from typing import Any
 
 import modal
 
-from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
-from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
-
+from infusers.modal_app.base import GenericModelRunner, OutputMapping, RouteDef, RunnerError
+from infusers.modal_app.translators.atomic import TensorToWebpB64
 from infusers.model.weights import FLOW_FILENAME
 
 APP_NAME = "lunas-courageous-adventure"
@@ -60,9 +59,12 @@ class LunasCourageousAdventure(GenericModelRunner):
         RouteDef(
             path="klein9b.image",
             recipe="quant/flux/klein9b/image_basic",
-            output_key="image",
-            intermediate_translators=[GetAttr("message")],
-            final_translators=[GetAttr("image"), TensorToWebpB64()],
+            intermediate_outputs=[
+                OutputMapping(consume_from="message", produce_to="message"),
+            ],
+            final_outputs=[
+                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+            ],
             allowed_input_translators={
                 "cond_images": ["list_apply[imageb64_to_tensor]"],
             },

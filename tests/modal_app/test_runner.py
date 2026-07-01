@@ -9,8 +9,14 @@ from dataclasses import dataclass
 import pytest
 import torch
 
-from infusers.modal_app.base import DESCRIBE_PATH, GenericModelRunner, RouteDef, RunnerError
-from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
+from infusers.modal_app.base import (
+    DESCRIBE_PATH,
+    GenericModelRunner,
+    OutputMapping,
+    RouteDef,
+    RunnerError,
+)
+from infusers.modal_app.translators.atomic import TensorToWebpB64
 from infusers.quant.api.base import IntermediateEvent
 from infusers.quant.api.image_base import ImageOutput
 
@@ -57,9 +63,13 @@ class MockStreamQuant:
 ECHO_ROUTE = RouteDef(
     path="test/echo",
     recipe="quant/test/echo",
-    output_key="image",
-    final_translators=[GetAttr("image"), TensorToWebpB64()],
-    intermediate_translators=[GetAttr("message")],
+    intermediate_outputs=[
+        OutputMapping(consume_from="message", produce_to="message"),
+    ],
+    final_outputs=[
+        OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+        OutputMapping(consume_from="echo", produce_to="echo"),
+    ],
     allowed_input_translators={
         "tags": ["list_apply[identity]"],
     },
@@ -83,8 +93,13 @@ def runner() -> EchoRunner:
 def test_describe_returns_routes_and_translators(runner: EchoRunner) -> None:
     out = runner.run({"path": DESCRIBE_PATH})
     assert "result" in out
-    assert ECHO_ROUTE.path in out["result"]["routes"]
-    assert "GetAttr('image')" in out["result"]["routes"][ECHO_ROUTE.path]["final_translators"]
+    route_desc = out["result"]["routes"][ECHO_ROUTE.path]
+    assert route_desc["final_outputs"][0]["translators"] == ["TensorToWebpB64()"]
+    assert route_desc["output_schema"] == {
+        "image": "string (webp base64)",
+        "echo": "pass-through",
+    }
+    assert route_desc["stream_schema"]["progress"] == {"message": "pass-through"}
     assert "imageb64_to_tensor" in out["result"]["available_translators"]
     assert out["metadata"]["path"] == DESCRIBE_PATH
 
@@ -98,6 +113,7 @@ def test_infer_happy_path(runner: EchoRunner) -> None:
     )
     assert "image" in out["result"]
     assert isinstance(out["result"]["image"], str)
+    assert out["result"]["echo"] == "hello"
     assert out["metadata"]["path"] == ECHO_ROUTE.path
     assert runner._mock.calls == [{"prompt": "hello"}]  # type: ignore[attr-defined]
 
@@ -156,9 +172,12 @@ def test_disallowed_translator_raises(runner: EchoRunner) -> None:
 STREAM_ROUTE = RouteDef(
     path="test/stream",
     recipe="quant/test/stream",
-    output_key="image",
-    intermediate_translators=[GetAttr("message")],
-    final_translators=[GetAttr("image"), TensorToWebpB64()],
+    intermediate_outputs=[
+        OutputMapping(consume_from="message", produce_to="message"),
+    ],
+    final_outputs=[
+        OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+    ],
     allowed_input_translators={},
 )
 
@@ -187,7 +206,7 @@ def test_run_stream_emits_progress_and_result(stream_runner: StreamRunner) -> No
     for frame in frames:
         payload = json.loads(frame.removeprefix("data: ").strip())
         if payload["kind"] == "progress":
-            progress.append(payload["message"])
+            progress.append(payload["progress"]["message"])
         elif payload["kind"] == "result":
             result = payload
 

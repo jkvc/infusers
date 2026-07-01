@@ -49,8 +49,8 @@ for line in Path("/tmp/klein-stream.txt").read_text().splitlines():
         continue
     payload = json.loads(line.removeprefix("data:").strip())
     if payload["kind"] == "progress":
-        progress.append(payload["message"])
-        print(f"  progress: {payload['message']}")
+        progress.append(payload["progress"]["message"])
+        print(f"  progress: {payload['progress']['message']}")
     elif payload["kind"] == "result":
         result = payload
 

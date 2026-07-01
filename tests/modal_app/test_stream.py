@@ -13,7 +13,7 @@ from infusers.quant.api.image_base import DummyImageQuant, ImageOutput
 
 
 def test_encode_sse_format() -> None:
-    payload = {"kind": "progress", "message": "step 1/3"}
+    payload = {"kind": "progress", "progress": {"message": "step 1/3"}}
     frame = encode_sse(payload)
     assert frame.startswith("data: ")
     assert frame.endswith("\n\n")

@@ -10,8 +10,8 @@ from typing import Any
 
 import modal
 
-from infusers.modal_app.base import GenericModelRunner, RouteDef, RunnerError
-from infusers.modal_app.translators.atomic import GetAttr, TensorToWebpB64
+from infusers.modal_app.base import GenericModelRunner, OutputMapping, RouteDef, RunnerError
+from infusers.modal_app.translators.atomic import TensorToWebpB64
 
 APP_NAME = "infusers-dummy-image"
 STREAM_LABEL = f"{APP_NAME}-stream"
@@ -42,9 +42,12 @@ class DummyImageRunner(GenericModelRunner):
         RouteDef(
             path=DUMMY_PATH,
             recipe="quant/image_basic_dummy",
-            output_key="image",
-            intermediate_translators=[GetAttr("message")],
-            final_translators=[GetAttr("image"), TensorToWebpB64()],
+            intermediate_outputs=[
+                OutputMapping(consume_from="message", produce_to="message"),
+            ],
+            final_outputs=[
+                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+            ],
             allowed_input_translators={},
         ),
     ]
@@ -130,7 +133,7 @@ def smoke_stream(
         line = chunk.removeprefix("data: ").strip()
         payload = json.loads(line)
         if payload["kind"] == "progress":
-            progress.append(payload["message"])
+            progress.append(payload["progress"]["message"])
         elif payload["kind"] == "result":
             result_payload = payload
 

@@ -20,6 +20,7 @@ from infusers.modal_app.stream import (
     encode_sse,
     run_generator_in_thread,
 )
+from infusers.modal_app.translators.atomic import TensorToWebpB64
 from infusers.modal_app.translators.context import TranslatorContext
 from infusers.modal_app.translators.dsl import apply
 from infusers.modal_app.translators.registry import TranslatorFn, apply_chain, registered_names
@@ -29,12 +30,20 @@ DESCRIBE_PATH = "__DESCRIBE__"
 
 
 @dataclass(frozen=True)
+class OutputMapping:
+    """Map one quant output attribute through translators into the wire payload."""
+
+    consume_from: str
+    produce_to: str
+    translators: list[TranslatorFn] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class RouteDef:
     path: str
     recipe: str
-    output_key: str
-    final_translators: list[TranslatorFn]
-    intermediate_translators: list[TranslatorFn] = field(default_factory=list)
+    final_outputs: list[OutputMapping]
+    intermediate_outputs: list[OutputMapping] = field(default_factory=list)
     allowed_input_translators: dict[str, list[str]] = field(default_factory=dict)
 
 
@@ -87,12 +96,12 @@ class GenericModelRunner:
         log_event("quant_end", elapsed_ms=quant_ms)
 
         translate_t0 = time.perf_counter()
-        translated = apply_chain(route.final_translators, out, ctx)
+        result = self._apply_output_mappings(route.final_outputs, out, ctx)
         translate_ms = int((time.perf_counter() - translate_t0) * 1000)
         log_event(
             "output_translators_applied",
             elapsed_ms=translate_ms,
-            output=summarize_output_value(route.output_key, translated),
+            output=self._summarize_wire_payload(result),
         )
 
         total_ms = int((time.perf_counter() - wall_t0) * 1000)
@@ -106,7 +115,7 @@ class GenericModelRunner:
         )
 
         return {
-            "result": {route.output_key: translated},
+            "result": result,
             "metadata": self._build_metadata(
                 route,
                 total_ms=total_ms,
@@ -139,9 +148,13 @@ class GenericModelRunner:
 
         for frame in bridge.iter_frames():
             if frame.kind == "intermediate":
-                translated = apply_chain(route.intermediate_translators, frame.value, ctx)
-                log_event("progress_event", message=translated)
-                yield encode_sse({"kind": "progress", "message": translated})
+                progress = self._apply_output_mappings(
+                    route.intermediate_outputs,
+                    frame.value,
+                    ctx,
+                )
+                log_event("progress_event", progress=progress)
+                yield encode_sse({"kind": "progress", "progress": progress})
                 continue
 
             if frame.kind == "error":
@@ -155,12 +168,12 @@ class GenericModelRunner:
             log_event("quant_stream_end", elapsed_ms=quant_ms)
 
             translate_t0 = time.perf_counter()
-            translated = apply_chain(route.final_translators, frame.value, ctx)
+            result = self._apply_output_mappings(route.final_outputs, frame.value, ctx)
             translate_ms = int((time.perf_counter() - translate_t0) * 1000)
             log_event(
                 "output_translators_applied",
                 elapsed_ms=translate_ms,
-                output=summarize_output_value(route.output_key, translated),
+                output=self._summarize_wire_payload(result),
             )
 
             total_ms = int((time.perf_counter() - wall_t0) * 1000)
@@ -182,7 +195,7 @@ class GenericModelRunner:
             yield encode_sse(
                 {
                     "kind": "result",
-                    "result": {route.output_key: translated},
+                    "result": result,
                     "metadata": metadata,
                 }
             )
@@ -190,6 +203,48 @@ class GenericModelRunner:
             return
 
         thread.join(timeout=1)
+
+    def _apply_output_mappings(
+        self,
+        mappings: list[OutputMapping],
+        source: Any,
+        ctx: TranslatorContext,
+    ) -> dict[str, Any]:
+        if not mappings:
+            raise RunnerError("Route has no output mappings configured", status_code=500)
+
+        result: dict[str, Any] = {}
+        for mapping in mappings:
+            if not hasattr(source, mapping.consume_from):
+                raise RunnerError(
+                    f"Quant output {type(source).__name__!r} has no attribute "
+                    f"{mapping.consume_from!r} (produce_to={mapping.produce_to!r})",
+                    status_code=500,
+                )
+            raw = getattr(source, mapping.consume_from)
+            result[mapping.produce_to] = apply_chain(mapping.translators, raw, ctx)
+        return result
+
+    @staticmethod
+    def _summarize_wire_payload(payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            key: summarize_output_value(key, value)["value"]
+            for key, value in payload.items()
+        }
+
+    @staticmethod
+    def _wire_type(mapping: OutputMapping) -> str:
+        if any(isinstance(step, TensorToWebpB64) for step in mapping.translators):
+            return "string (webp base64)"
+        return "pass-through"
+
+    @staticmethod
+    def _mapping_spec(mapping: OutputMapping) -> dict[str, Any]:
+        return {
+            "consume_from": mapping.consume_from,
+            "produce_to": mapping.produce_to,
+            "translators": [repr(step) for step in mapping.translators],
+        }
 
     def _prepare_inference(
         self,
@@ -293,12 +348,16 @@ class GenericModelRunner:
             routes[route.path] = {
                 "recipe": route.recipe,
                 "allowed_input_translators": route.allowed_input_translators,
-                "final_translators": [repr(t) for t in route.final_translators],
-                "intermediate_translators": [repr(t) for t in route.intermediate_translators],
-                "output_schema": {route.output_key: "string (webp base64)"},
+                "final_outputs": [self._mapping_spec(m) for m in route.final_outputs],
+                "intermediate_outputs": [self._mapping_spec(m) for m in route.intermediate_outputs],
+                "output_schema": {
+                    m.produce_to: self._wire_type(m) for m in route.final_outputs
+                },
                 "stream_schema": {
-                    "progress": "string message",
-                    "result": {route.output_key: "string (webp base64)"},
+                    "progress": {
+                        m.produce_to: self._wire_type(m) for m in route.intermediate_outputs
+                    },
+                    "result": {m.produce_to: self._wire_type(m) for m in route.final_outputs},
                 },
             }
 
