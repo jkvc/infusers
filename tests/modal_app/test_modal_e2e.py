@@ -1,4 +1,4 @@
-"""End-to-end tests against deployed Modal infrastructure (dummy CPU runner)."""
+"""End-to-end tests against deployed Modal infrastructure (opt-in: pytest -m modal)."""
 
 from __future__ import annotations
 

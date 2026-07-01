@@ -52,6 +52,8 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not gpu and not modal'"
 markers = [
-    "modal: end-to-end tests against deployed Modal infrastructure (slow, needs auth)",
+    "modal: deployed Modal e2e (slow; run: uv run pytest -m modal)",
+    "gpu: local GPU + staged Klein weights (run: uv run pytest -m gpu)",
 ]

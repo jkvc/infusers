@@ -69,6 +69,24 @@ class LunasCourageousAdventure(GenericModelRunner):
                 "cond_images": ["list_apply[imageb64_to_tensor]"],
             },
         ),
+        RouteDef(
+            path="klein9b.pano",
+            recipe="quant/flux/klein9b/pano_basic",
+            intermediate_outputs=[
+                OutputMapping(consume_from="message", produce_to="message"),
+            ],
+            final_outputs=[
+                OutputMapping(consume_from="image", produce_to="image", translators=[TensorToWebpB64()]),
+                OutputMapping(consume_from="direction", produce_to="direction"),
+                OutputMapping(consume_from="slice_resolution", produce_to="slice_resolution"),
+                OutputMapping(consume_from="output_size", produce_to="output_size"),
+                OutputMapping(consume_from="num_slices", produce_to="num_slices"),
+                OutputMapping(consume_from="overlap_pixels", produce_to="overlap_pixels"),
+            ],
+            allowed_input_translators={
+                "cond_images": ["list_apply[imageb64_to_tensor]"],
+            },
+        ),
     ]
 
     @modal.enter()
@@ -184,6 +202,46 @@ def smoke_cond(
     out.write_bytes(base64.b64decode(image_b64))
     meta = response.get("metadata", {})
     print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
+    print(f"metadata: {meta}")
+
+
+@app.local_entrypoint()
+def smoke_pano(
+    seed: int = 42,
+    num_steps: int | None = None,
+) -> None:
+    """CLI pano smoke: uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano"""
+    service = LunasCourageousAdventure()
+    t0 = time.perf_counter()
+
+    inputs: dict[str, object] = {
+        "prompts": ["warm desert dunes at sunset", "cool ocean horizon at dusk"],
+        "seed": seed,
+        "resolution": [512, 1024],
+        "pano_direction": "horizontal",
+        "overlap_pixels": 256,
+    }
+    if num_steps is not None:
+        inputs["num_steps"] = num_steps
+
+    body = {
+        "path": "klein9b.pano",
+        "inputs": inputs,
+    }
+    response = service.run_remote.remote(body)
+    elapsed = time.perf_counter() - t0
+
+    image_b64 = response["result"]["image"]
+    step_label = num_steps if num_steps is not None else "default"
+    out = Path(f"/tmp/klein-smoke-pano-steps-{step_label}.webp")
+    out.write_bytes(base64.b64decode(image_b64))
+    meta = response.get("metadata", {})
+    result = response.get("result", {})
+    print(f"done in {elapsed:.1f}s -> {out} ({out.stat().st_size} bytes)")
+    print(
+        f"output: {result.get('output_size')} direction={result.get('direction')} "
+        f"slices={result.get('num_slices')} overlap={result.get('overlap_pixels')}"
+    )
     print(f"metadata: {meta}")
 
 

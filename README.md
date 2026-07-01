@@ -11,8 +11,8 @@ infusers/
 ├── infusers/
 │   ├── configs/     # reqm YAML recipes (models + quants)
 │   ├── model/       # Model implementations (KleinModel, …)
-│   ├── quant/       # Inferencers (FluxImageQuant, …)
-│   ├── scripts/     # inference_image.py CLI
+│   ├── quant/       # Inferencers (FluxImageQuant, FluxPanoramaQuant, …)
+│   ├── scripts/     # inference_image.py, inference_pano.py CLIs
 │   └── modal_app/   # Modal deploy modules
 ├── docs/
 ├── scripts/         # Weight staging, upload, smoke tests
@@ -66,12 +66,16 @@ uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 | `uv run modal setup` | Authenticate Modal CLI |
 | `uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py` | Deploy Klein 9B |
 | `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke` | CLI smoke (uses `modal setup`, no proxy token) |
+| `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano` | CLI pano smoke |
 | `./scripts/smoke.sh` | HTTP JSON smoke (needs `.env` proxy token) |
 | `./scripts/smoke_stream.sh` | HTTP SSE smoke (needs `.env`) |
 | `uv run ruff check .` | Lint |
 | `uv run black .` | Format |
-| `uv run pytest` | Unit tests |
-| `uv run python -m infusers.scripts.inference_image --recipe quant/flux/klein9b/image_basic -p "…" -o out/` | Local GPU inference via reqm |
+| `uv run pytest` | Unit tests (excludes `-m gpu` and `-m modal`) |
+| `uv run pytest -m gpu` | Local GPU smoke (needs CUDA + staged weights) |
+| `uv run pytest -m modal` | Modal deploy + run e2e (needs `uv run modal setup`) |
+| `uv run python -m infusers.scripts.inference_image --recipe quant/flux/klein9b/image_basic -p "…" -o out/` | Local GPU t2i via reqm |
+| `uv run python -m infusers.scripts.inference_pano --recipe quant/flux/klein9b/pano_basic -p "slice A" -p "slice B" -o out/` | Local GPU panorama via reqm |
 
 ## Adding a Modal app
 
@@ -86,7 +90,7 @@ All call sites use `from infusers import QM` — one chokepoint, recipe name is 
 
 Copy `.env.example` → `.env` and fill in proxy token + lunas endpoint URLs (`.env` is gitignored).
 
-**One Modal deploy = two URLs** (JSON + stream). Every route on that app (`klein9b.image`, future paths) shares them — the request body `"path"` picks the recipe. Adding a model is a new `RouteDef`, not a new env var. A second deploy (e.g. dummy CPU app) is optional and gets its own URL pair.
+**One Modal deploy = two URLs** (JSON + stream). Every route on that app (`klein9b.image`, `klein9b.pano`, …) shares them — the request body `"path"` picks the recipe. Adding a model is a new `RouteDef`, not a new env var. A second deploy (e.g. dummy CPU app) is optional and gets its own URL pair.
 
 | Variable | Description |
 | --- | --- |
