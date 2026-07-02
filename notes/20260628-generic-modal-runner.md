@@ -4,7 +4,7 @@ Replaces the hardcoded Klein Modal app with a reusable runner: multiple inferenc
 
 ## Motivation
 
-The first Modal app baked in one recipe, fixed request fields, and JPEG bytes on the wire. Callers (jkvc, scripts) need a stable JSON envelope, optional input translation (caller knows wire format), and route-defined output translation (server knows quant return type). Inspired by the-cabin's AIDemos `{ path, inputs, translator }` pattern but infusers-native: no attachments blob, output translators as Python class instances, input translators as a bracket DSL string the caller supplies per field.
+The first Modal app baked in one recipe, fixed request fields, and JPEG bytes on the wire. Callers need a stable JSON envelope, optional input translation (caller knows wire format), and route-defined output translation (server knows quant return type). Pattern: `{ path, inputs, translator }` — infusers-native: no attachments blob, output translators as Python class instances, input translators as a bracket DSL string the caller supplies per field.
 
 ## Layout
 

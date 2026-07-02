@@ -4,7 +4,7 @@ Guidance for AI assistants working in this repo.
 
 ## Project Overview
 
-**infusers** — custom ML inference for jkvc: inferencer logic (MultiDiffusion, panorama, tiled modes, etc.) and private [Modal](https://modal.com) GPU deployments. The product is **one weight load, many parametrized algorithms** — not fixed third-party pipelines. See [`notes/`](notes/) for architecture and hosting decisions. Modal ops: [`docs/modal.md`](docs/modal.md).
+**infusers** — custom ML inference: pluggable quant algorithms (panorama, localized edit, tiled modes, etc.) over shared reqm-managed models, with optional [Modal](https://modal.com) GPU deployment. The product is **one weight load, many parametrized algorithms** — not fixed third-party pipelines. See [`notes/`](notes/) for architecture and hosting decisions. Modal ops: [`docs/modal.md`](docs/modal.md).
 
 ## Important Rules
 
@@ -49,7 +49,7 @@ infusers/
 ├── infusers/
 │   ├── configs/       # reqm YAML (models + quants)
 │   ├── model/         # Model implementations (KleinModel, …)
-│   ├── quant/         # Inferencers (FluxImageQuant, …)
+│   ├── quant/         # Quants (FluxImageQuant, …)
 │   ├── scripts/       # inference_image.py CLI
 │   └── modal_app/     # Modal deploy modules
 ├── docs/              # Operational guides (e.g. modal.md)
@@ -66,7 +66,7 @@ infusers/
 
 ### 8. Model Loading Convention
 
-Weights come from Hugging Face. Use **diffusers** for standard pipeline routes; port denoise loops from BFL's [`flux2`](https://github.com/black-forest-labs/flux2) reference when building custom inferencers. Do not passthrough hosted Klein SKUs — custom algorithms are the product.
+Weights come from Hugging Face. Use **diffusers** for standard pipeline routes; port denoise loops from BFL's [`flux2`](https://github.com/black-forest-labs/flux2) reference when building custom quants. Do not passthrough hosted model SKUs — custom algorithms are the product.
 
 ### 9. Track Tech Debt
 
@@ -78,4 +78,4 @@ Do **not** hard-wrap paragraphs in Markdown. Write each paragraph / list item as
 
 ### 11. Testing
 
-Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial inferencer math; skip tests for Modal glue and config-only changes where they add no signal.
+Tests live in `tests/`. Run with `uv run pytest`. A pre-push hook (`.githooks/pre-push`) runs ruff, `black --check`, and pytest before every push — enable once per clone with `git config core.hooksPath .githooks`. Practice TDD for non-trivial quant math; skip tests for Modal glue and config-only changes where they add no signal.

@@ -101,7 +101,7 @@ Base64 in logs is summarized as `{ kind, chars, bytes }` — never inlined.
 
 Each app sets `label=APP_NAME` on `web` and `label=f"{APP_NAME}-stream"` on `web_stream` so URLs are predictable per deploy.
 
-Klein: L40S, Volume weights, `scaledown_window=120`. Dummy: CPU-only, `scaledown_window=60`.
+Klein: L40S, Volume weights, `scaledown_window=300`. Dummy: CPU-only, `scaledown_window=60`.
 
 All `web` / `web_stream` endpoints use Modal `requires_proxy_auth=True` — callers need `Modal-Key` and `Modal-Secret` headers ([proxy auth tokens](https://modal.com/settings/proxy-auth-tokens)). Unauthenticated requests return 401 without spinning GPU containers.
 

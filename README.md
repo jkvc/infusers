@@ -1,8 +1,28 @@
 # infusers
 
-Custom ML inference for [jkvc](https://jkvc.ai): inferencer algorithms and private [Modal](https://modal.com) GPU deployments.
+Custom ML inference — load a model once, run many algorithms.
 
-One weight load, many parametrized modes (plain t2i, MultiDiffusion, panorama, tiled inference, etc.). See [`notes/`](notes/) for architecture and hosting decisions.
+infusers separates **models** (weights and modules), **quants** (parametrized inference algorithms), and **deployment** (local GPU, Modal, or your own host). Recipes are YAML configs managed by [reqm](https://pypi.org/project/reqm/); all entry points use `QM.build("…")`.
+
+MIT licensed. See [`docs/modal.md`](docs/modal.md) for optional serverless GPU deployment.
+
+## Highlights
+
+- **Shared model, many modes** — reqm caches model instances so multiple quants reuse one weight load
+- **Pluggable algorithms** — text-to-image, panorama stitching, localized latent edit, streaming progress, and more via the quant layer
+- **Flexible wire format** — generic Modal runner with route paths, declarative input translators, JSON and SSE responses
+- **Deploy anywhere** — local CLI, example Modal app, or embed the Python package in your own service
+
+## Capabilities
+
+| Capability | Status |
+| --- | --- |
+| Text-to-image | ✅ |
+| Panorama stitching | ✅ |
+| Localized edit (`signal_rgba` / vnsdedit) | ✅ |
+| MultiDiffusion, general tiled inference | Planned |
+
+Architecture and design notes: [`notes/`](notes/).
 
 ## Repository layout
 
@@ -10,8 +30,8 @@ One weight load, many parametrized modes (plain t2i, MultiDiffusion, panorama, t
 infusers/
 ├── infusers/
 │   ├── configs/     # reqm YAML recipes (models + quants)
-│   ├── model/       # Model implementations (KleinModel, …)
-│   ├── quant/       # Inferencers (FluxImageQuant, FluxPanoramaQuant, …)
+│   ├── model/       # Model implementations (weights + modules)
+│   ├── quant/       # Quants (FluxImageQuant, FluxPanoramaQuant, …)
 │   ├── scripts/     # inference_image.py, inference_pano.py CLIs
 │   └── modal_app/   # Modal deploy modules
 ├── docs/
@@ -24,8 +44,8 @@ infusers/
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) — install: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- NVIDIA GPU + CUDA driver (for local Klein inference)
-- A [Modal](https://modal.com) account (for deployments)
+- NVIDIA GPU + CUDA driver (for local inference with staged weights)
+- A [Modal](https://modal.com) account (optional, for serverless GPU deployment)
 
 ## Local setup
 
@@ -33,20 +53,23 @@ infusers/
 cd infusers
 
 uv sync --dev
-uv run modal setup
+uv run modal setup   # optional — only if deploying to Modal
 
 # Enable the pre-push hook (once per clone)
 git config core.hooksPath .githooks
 ```
 
-`uv sync --dev` installs flux2, torch (~3 GB of CUDA wheels), Modal CLI, and dev tools. One venv at `.venv/`.
+`uv sync --dev` installs torch (~3 GB of CUDA wheels), Modal CLI, and dev tools. One venv at `.venv/`.
 
-Hugging Face auth for gated weights (`FLUX.2-dev`, `FLUX.2-klein-9B`):
+### Weights
 
-1. Accept the licenses on Hugging Face
-2. `uv run hf auth login` (read token; saved to `~/.cache/huggingface/token`)
+This repo does not ship model weights. Accept the Hugging Face licenses for the models referenced by your recipes, then:
 
-## Modal deployment (Klein 9B)
+1. `uv run hf auth login` (read token; saved to `~/.cache/huggingface/token`)
+2. Stage locally: `./scripts/stage_weights.sh` (see [`docs/modal.md`](docs/modal.md))
+3. Or upload to a Modal Volume for serverless deploy: `./scripts/upload_weights.sh`
+
+## Modal deployment (optional)
 
 Full guide: [`docs/modal.md`](docs/modal.md).
 
@@ -57,6 +80,8 @@ uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py
 uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 ```
 
+The example app name (`lunas-courageous-adventure`) and Volume name are constants in the deploy module — rename them for your own workspace.
+
 ## Commands
 
 | Command | Description |
@@ -64,7 +89,7 @@ uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke
 | `uv sync --dev` | Install / update all dependencies |
 | `uv run hf auth login` | Hugging Face auth for gated model downloads |
 | `uv run modal setup` | Authenticate Modal CLI |
-| `uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py` | Deploy Klein 9B |
+| `uv run modal deploy infusers/modal_app/lunas_courageous_adventure.py` | Deploy example GPU app |
 | `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke` | CLI smoke (uses `modal setup`, no proxy token) |
 | `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano` | CLI pano smoke |
 | `./scripts/smoke.sh` | HTTP JSON smoke (needs `.env` proxy token) |
@@ -88,13 +113,13 @@ All call sites use `from infusers import QM` — one chokepoint, recipe name is 
 
 ## Environment
 
-Copy `.env.example` → `.env` and fill in proxy token + lunas endpoint URLs (`.env` is gitignored).
+Copy `.env.example` → `.env` and fill in proxy token + deployed app URLs (`.env` is gitignored).
 
-**One Modal deploy = two URLs** (JSON + stream). Every route on that app (`klein9b.image`, `klein9b.pano`, …) shares them — the request body `"path"` picks the recipe. Adding a model is a new `RouteDef`, not a new env var. A second deploy (e.g. dummy CPU app) is optional and gets its own URL pair.
+**One Modal deploy = two URLs** (JSON + stream). Every route on that app shares them — the request body `"path"` picks the recipe. Adding a route is a new `RouteDef`, not a new env var. A second deploy (e.g. dummy CPU app) is optional and gets its own URL pair.
 
 | Variable | Description |
 | --- | --- |
-| `MODAL_WEB_URL` | Primary app JSON endpoint (lunas) |
+| `MODAL_WEB_URL` | Primary app JSON endpoint |
 | `MODAL_STREAM_URL` | Primary app SSE — label `{APP_NAME}-stream` |
 | `MODAL_KEY` | Proxy auth token ID (`wk-…`) |
 | `MODAL_SECRET` | Proxy auth token secret (`ws-…`) |

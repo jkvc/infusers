@@ -1,12 +1,12 @@
-# Modal — Klein 9B deployment
+# Modal deployment
 
-Serverless GPU hosting for custom Klein inference. Background: [`notes/20260628-gpu-hosting-experiment.md`](../notes/20260628-gpu-hosting-experiment.md), live config: [`notes/20260628-modal-setup.md`](../notes/20260628-modal-setup.md).
+Optional serverless GPU hosting for infusers quants. You can also run recipes locally or embed the package in your own service. Background: [`notes/20260628-gpu-hosting-experiment.md`](../notes/20260628-gpu-hosting-experiment.md) (historical), ops reference: [`notes/20260628-modal-setup.md`](../notes/20260628-modal-setup.md).
 
 ## Prerequisites
 
 - Python 3.12+, [uv](https://docs.astral.sh/uv/)
 - Modal account — `uv run modal setup` (writes `~/.modal.toml`, gitignored)
-- Local HF auth for staging: accept [FLUX.2-klein-9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) and [FLUX.2-dev](https://huggingface.co/black-forest-labs/FLUX.2-dev) licenses, then `uv run hf auth login`
+- Local HF auth for staging: accept licenses for the gated models your recipes reference, then `uv run hf auth login`
 
 Modal is a **dev dependency**. Always run the CLI as `uv run modal …` (or `alias modal='uv run modal'` in your shell).
 
@@ -17,7 +17,7 @@ From repo root:
 ```bash
 uv sync --dev
 ./scripts/stage_weights.sh          # writes weights/klein-9b/ (gitignored)
-./scripts/upload_weights.sh         # → Modal Volume jkvc-klein-9b-weights
+./scripts/upload_weights.sh         # → Modal Volume (name in script)
 ```
 
 Upload is slow once; the Volume persists across deploys.
@@ -71,7 +71,7 @@ Streaming (SSE) — same request body, POST to the `/stream` endpoint (label var
 {"kind":"result","result":{"image":"<webp b64>"},"metadata":{...}}
 ```
 
-Klein stream URL pattern: `<workspace>--lunas-courageous-adventure-stream.modal.run` (label `{APP_NAME}-stream`; see deploy output).
+Stream URL pattern: `<workspace>--lunas-courageous-adventure-stream.modal.run` (label `{APP_NAME}-stream`; see deploy output). App name is configurable in the deploy module.
 
 Optional conditional images — caller must supply the input translator:
 
@@ -149,6 +149,30 @@ Pano response shape: `{ "result": { "images": ["<webp base64>", ...], "direction
 
 CLI pano smoke: `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_pano`
 
+## Localized edit (`signal_rgba`)
+
+Optional latent-space pasteback for region edits on the `klein9b.image` route. Send RGBA base64 with an input translator; `resolution` must match signal size exactly. Detail: [`notes/20260701-vnsdedit-signal-rgba.md`](../notes/20260701-vnsdedit-signal-rgba.md).
+
+```bash
+curl -X POST "$MODAL_WEB_URL" \
+  -H "Content-Type: application/json" \
+  -H "Modal-Key: $MODAL_KEY" \
+  -H "Modal-Secret: $MODAL_SECRET" \
+  -d '{
+    "path": "klein9b.image",
+    "inputs": {
+      "prompt": "watercolor style on the masked region",
+      "seed": 43,
+      "resolution": [768, 768],
+      "num_steps": 20,
+      "signal_rgba": "<base64 PNG RGBA>"
+    },
+    "translator": { "signal_rgba": "rgba_b64_to_tensor" }
+  }' | jq .
+```
+
+Smoke: `uv run modal run infusers/modal_app/lunas_courageous_adventure.py::smoke_vnsdedit`
+
 ## pytest (local)
 
 Default `uv run pytest` runs unit tests only — **excludes** `gpu` and `modal` markers (fast; safe for pre-push).
@@ -158,9 +182,9 @@ Default `uv run pytest` runs unit tests only — **excludes** `gpu` and `modal` 
 | Unit (default) | `uv run pytest` | Every push / CI |
 | Local GPU smoke | `uv run pytest -m gpu` | Machine with CUDA + staged weights |
 | Modal deploy e2e | `uv run pytest -m modal` | After `uv run modal setup`; deploys dummy app |
-| Deployed HTTP audit | `./scripts/smoke.sh` / `smoke_stream.sh` | Needs `.env` proxy token + live Klein URL |
+| Deployed HTTP audit | `./scripts/smoke.sh` / `smoke_stream.sh` | Needs `.env` proxy token + live deploy URL |
 
-For Klein/pano validation without local GPU, use Modal entrypoints (`smoke`, `smoke_pano`) or HTTP smoke scripts against the deployed app.
+For GPU route validation without local hardware, use Modal entrypoints (`smoke`, `smoke_pano`) or HTTP smoke scripts against a deployed app.
 
 ## Dummy runner (CPU, no weights)
 
@@ -172,7 +196,7 @@ uv run modal run infusers/modal_app/dummy_image.py::smoke
 uv run modal run infusers/modal_app/dummy_image.py::smoke_stream
 ```
 
-Path: `dummy.image`. Same JSON envelope as Klein; streams progress messages then the final WebP.
+Path: `dummy.image`. Same JSON envelope as GPU routes; streams progress messages then the final WebP.
 
 ## Day-to-day workflow
 
@@ -212,17 +236,17 @@ Code-only deploys are fast (small image). Weights mount from Volume at container
 
 ## Runtime behavior
 
-- **GPU:** L40S
-- **Setup:** loads `KleinModel` via reqm (~60s) — no warmup infer in setup
+- **GPU:** L40S (example deploy)
+- **Setup:** loads model via reqm (~60s) — no warmup infer in setup
 - **Cold first request:** setup + first infer (~70s total wall on HTTP)
 - **Warm:** ~1s per request while container is up
-- **`scaledown_window`:** 120s idle billing window
+- **`scaledown_window`:** 300s idle billing window
 
 ## Troubleshooting
 
 **`command not found: modal`** — use `uv run modal`, not bare `modal`.
 
-**`Missing klein weights`** — run `upload_weights.sh` (Modal) or `stage_weights.sh` (local).
+**`Missing weights`** — run `upload_weights.sh` (Modal) or `stage_weights.sh` (local).
 
 **Config errors** — run `QM.validate()`; every YAML needs `# @package _global_` header.
 

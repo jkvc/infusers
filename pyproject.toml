@@ -1,8 +1,9 @@
 [project]
 name = "infusers"
 version = "0.1.0"
-description = "Custom ML inference — inferencer logic and Modal deployments for jkvc"
+description = "Custom ML inference — shared models via reqm, pluggable quants, flexible deployment"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "flux",
@@ -55,5 +56,5 @@ testpaths = ["tests"]
 addopts = "-m 'not gpu and not modal'"
 markers = [
     "modal: deployed Modal e2e (slow; run: uv run pytest -m modal)",
-    "gpu: local GPU + staged Klein weights (run: uv run pytest -m gpu)",
+    "gpu: local GPU + staged weights (run: uv run pytest -m gpu)",
 ]

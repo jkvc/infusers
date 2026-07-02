@@ -22,4 +22,4 @@ Known shortcuts and deferred work. Record every conscious shortcut here; delete 
 
 **Why:** Hosting experiment prioritized 9B cold-boot validation before multi-endpoint rollout.
 
-**Fix:** Add another `infusers/modal_app/*.py` per `notes/2026-06-08-kickoff.md` once inferencer modes land.
+**Fix:** Add another `infusers/modal_app/*.py` per `notes/2026-06-08-kickoff.md` once additional quant modes land.

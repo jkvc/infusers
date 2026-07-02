@@ -1,12 +1,12 @@
-# Modal setup — Klein 9B (2026-06-28)
+# Modal setup (2026-06-28)
 
-Current production path for Klein 9B smoke inference. Operational commands: [`docs/modal.md`](../docs/modal.md).
+Example GPU deploy for smoke inference. Operational commands: [`docs/modal.md`](../docs/modal.md).
 
 ## Workspace
 
-- **Modal profile:** `kevinehc` (token in `~/.modal.toml`, gitignored)
+- **Modal profile:** `<workspace>` (token in `~/.modal.toml`, gitignored)
 - **App name:** `lunas-courageous-adventure`
-- **Dashboard:** https://modal.com/apps/kevinehc/main/deployed/lunas-courageous-adventure
+- **Dashboard:** https://modal.com/apps/<workspace>/main/deployed/lunas-courageous-adventure
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Current production path for Klein 9B smoke inference. Operational commands: [`do
 Local staging (weights/klein-9b/)
         │
         ▼  modal volume put (one-time)
-Modal Volume: jkvc-klein-9b-weights  →  mounted at /weights
+Modal Volume (see `VOLUME_NAME` in deploy module) → mounted at /weights
         │
         ▼  small code image (torch, flux2, infusers)
 L40S container @modal.enter setup()
@@ -40,8 +40,8 @@ Labels: `web` = `APP_NAME`, `web_stream` = `{APP_NAME}-stream`. Requires proxy a
 
 | Endpoint | URL |
 | --- | --- |
-| JSON | `https://kevinehc--lunas-courageous-adventure.modal.run` |
-| SSE stream | `https://kevinehc--lunas-courageous-adventure-stream.modal.run` |
+| JSON | `https://<workspace>--lunas-courageous-adventure.modal.run` |
+| SSE stream | `https://<workspace>--lunas-courageous-adventure-stream.modal.run` |
 | Swagger | JSON URL + `/docs` |
 
 HTTP smoke: `./scripts/smoke.sh` and `./scripts/smoke_stream.sh` (`.env` from `.env.example`).
@@ -53,7 +53,7 @@ POST JSON — see [`20260628-generic-modal-runner.md`](20260628-generic-modal-ru
 | Setting | Value | Rationale |
 | --- | --- | --- |
 | `gpu` | `L40S` | 48GB; FP8 Qwen + Klein 9B fits |
-| `scaledown_window` | `120` | Stay warm 2 min after last request; balance idle cost vs burst latency |
+| `scaledown_window` | `300` | Stay warm 5 min after last request; balance idle cost vs burst latency |
 | `timeout` | `600` | Cold setup ~60s headroom |
 
 ## Measured performance (2026-06-28)

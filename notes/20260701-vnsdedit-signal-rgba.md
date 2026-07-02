@@ -1,10 +1,10 @@
 # VN SDEdit via `signal_rgba` (2026-07-01)
 
-Latent-space signal pasteback for localized image edits on Klein 9B. Extends the existing `klein9b.image` route — no new recipe or Modal path. Wire-format details: [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md). Ops: [`docs/modal.md`](../docs/modal.md).
+Latent-space signal pasteback for localized image edits. Extends the existing `klein9b.image` route — no new recipe or Modal path. Wire-format details: [`20260628-generic-modal-runner.md`](20260628-generic-modal-runner.md). Ops: [`docs/modal.md`](../docs/modal.md).
 
 ## Motivation
 
-the-cabin **localized variation** edits a region around a click while preserving the rest of the image. Cabin sends separate `signalImage` + `signalMask` to a deconstructed Llama route. infusers folds the same semantics into one optional tensor on `FluxImageQuant`, matching cabin mask conventions (α=1 → edit freely, α=0 → preserve signal) and strict 1:1 resolution (no kontext snap, no resize).
+**Localized variation** edits a region around a click while preserving the rest of the image. Some stacks send separate signal image + mask fields; infusers folds the same semantics into one optional tensor on `FluxImageQuant`, with mask conventions (α=1 → edit freely, α=0 → preserve signal) and strict 1:1 resolution (no kontext snap, no resize).
 
 Blend is **latent-only** during denoise — no pixel pasteback after decode.
 
@@ -68,7 +68,7 @@ Mask semantics in blend: **higher mask values → edit region** (less pasteback 
 | `scripts/vnsdedit_e2e.py` | HTTP e2e: t2i (4 steps) → radial mask → vnsdedit (20 steps) × 3 samples → `tmp/vnsdedit-e2e/` |
 | `infusers/modal_app/lunas_courageous_adventure.py` | Route translator allowlist; `smoke_vnsdedit` entrypoint |
 
-`compute_radial_mask` mirrors cabin localized-variation falloff (cosine / linear / gaussian). Used by e2e and smoke scripts on the client; not invoked inside the GPU quant path.
+`compute_radial_mask` provides localized-variation-style falloff (cosine / linear / gaussian). Used by e2e and smoke scripts on the client; not invoked inside the GPU quant path.
 
 ## Testing
 
@@ -87,6 +87,5 @@ After a code-only deploy, **warm containers may still run the previous image** u
 
 ## Not in scope (yet)
 
-- Cabin / jkvc UI wiring (cabin still uses Llama deconstructed route).
+- External UI wiring for localized edit flows.
 - `signal_rgba` on pano or other quants.
-- `docs/modal.md` curl example for `signal_rgba` (add when documenting for external callers).

@@ -1,4 +1,4 @@
-"""Custom inferencer logic for jkvc ML inference."""
+"""Custom ML inference — shared models via reqm, pluggable quants."""
 
 from reqm import QuantManager
 
